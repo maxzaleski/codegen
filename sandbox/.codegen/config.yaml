@@ -1,0 +1,37 @@
+general:
+  comment-prefix: //
+
+pkg:
+  base-path: ./pkg
+  extension: .go
+  
+  service:
+    file-name: service
+    always-include:
+      params:
+        - name: ctx
+          type: context.Context
+      returns:
+        - type: error
+      
+  repository:
+    file-name: repository
+    always-include:
+      params:
+        - name: ctx
+          type: context.Context
+      returns:
+        - type: error
+  
+  addons:
+    - name: Logger
+      file-suffix: _logger
+      template: go/service_logger
+      on:
+        - service
+
+    - name: Testing
+      file-suffix: _test
+      template: go/repository_test
+      on:
+        - repository
