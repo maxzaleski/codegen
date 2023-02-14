@@ -2,46 +2,40 @@ package core
 
 type Spec struct {
 	// Represents the global configuration.
-	GlobalConfig GlobalConfig
+	GlobalConfig *GlobalConfig
 	// Represents the packages to be generated.
-	Pkgs []Pkg
+	Pkgs []*Pkg
 }
 
 type GlobalConfig struct {
-	// Represents the global configuration.
-	General *GCGeneral `yaml:"general"`
-	// Represents the global `pkg` configuration.
-	Pkg *GCPkg `yaml:"pkg"`
-	// Represents the global addon configuration.
-	Addons []Addon `yaml:"addons"`
-}
-
-type GCGeneral struct {
 	CommentPrefix string `yaml:"comment-prefix"`
+	Pkg           *GCPkg `yaml:"pkg"`
 }
 
 type GCPkg struct {
-	BasePath        string  `yaml:"base-path"`
-	ServiceLayer    *Layer  `yaml:"service,omitempty"`
-	RepositoryLayer *Layer  `yaml:"repository,omitempty"`
-	Addons          []Addon `yaml:"addons"`
+	Extension       string    `yaml:"extension"`
+	BasePath        string    `yaml:"base-path"`
+	ServiceLayer    *Layer    `yaml:"service,omitempty"`
+	RepositoryLayer *Layer    `yaml:"repository,omitempty"`
+	Plugins         []*Plugin `yaml:"addons"`
 }
 
-type Addon struct {
-	Name       string             `yaml:"name"`
-	Template   string             `yaml:"template"`
-	FileSuffix string             `yaml:"file-suffix"`
-	On         []AddonApplication `yaml:"on,omitempty"`
+type Plugin struct {
+	Name       string               `yaml:"name"`
+	Template   string               `yaml:"template"`
+	FileSuffix string               `yaml:"file-suffix"`
+	On         []*PluginApplication `yaml:"on,omitempty"`
 }
 
 type Layer struct {
 	FileName      string         `yaml:"file-name"`
+	Template      string         `yaml:"template"`
 	AlwaysInclude *AlwaysInclude `yaml:"always-include,omitempty"`
 }
 
 type AlwaysInclude struct {
-	Params  []Argument       `yaml:"params,omitempty"`
-	Returns []ReturnArgument `yaml:"returns,omitempty"`
+	Params  []*Argument       `yaml:"params,omitempty"`
+	Returns []*ReturnArgument `yaml:"returns,omitempty"`
 }
 
 type Argument struct {
@@ -52,11 +46,11 @@ type Argument struct {
 
 type ReturnArgument = Argument
 
-type AddonApplication string
+type PluginApplication string
 
 const (
-	AddonApplicationService    AddonApplication = "service"
-	AddonApplicationRepository AddonApplication = "repository"
+	AddonApplicationService    PluginApplication = "service"
+	AddonApplicationRepository PluginApplication = "repository"
 )
 
 type Entity struct {
@@ -65,8 +59,8 @@ type Entity struct {
 }
 
 type EntityWithScope struct {
-	Entity
-	Scope EntityScope `yaml:"scope"`
+	Entity `yaml:",inline"`
+	Scope  EntityScope `yaml:"scope"`
 }
 
 type EntityScope string
@@ -78,32 +72,33 @@ const (
 )
 
 type Pkg struct {
-	Entity
-	Models    []Model   `yaml:"models,omitempty"`
-	Interface Interface `yaml:"interface"`
+	Entity    `yaml:",inline"`
+	Extension string     `yaml:"extension"`
+	Models    []Model    `yaml:"models,omitempty"`
+	Interface *Interface `yaml:"interface"`
 }
 
 type Model struct {
-	EntityWithScope
-	Extends    string     `yaml:"extends"`
-	Implements string     `yaml:"implements"`
-	Properties []Property `yaml:"props,omitempty"`
-	Methods    []Method   `yaml:"methods,omitempty"`
+	EntityWithScope `yaml:",inline"`
+	Extends         string     `yaml:"extends"`
+	Implements      string     `yaml:"implements"`
+	Properties      []Property `yaml:"props,omitempty"`
+	Methods         []Method   `yaml:"methods,omitempty"`
 }
 
 type Property struct {
-	EntityWithScope
-	Type   string                  `yaml:"type"`
-	Addons *map[string]interface{} `yaml:"addons,omitempty"`
+	EntityWithScope `yaml:",inline"`
+	Type            string                  `yaml:"type"`
+	Addons          *map[string]interface{} `yaml:"addons,omitempty"`
 }
 
 type Method struct {
-	EntityWithScope
-	Params  []Argument       `yaml:"params,omitempty"`
-	Returns []ReturnArgument `yaml:"returns,omitempty"`
+	EntityWithScope `yaml:",inline"`
+	Params          []*Argument       `yaml:"params,omitempty"`
+	Returns         []*ReturnArgument `yaml:"returns,omitempty"`
 }
 
 type Interface struct {
-	Description string   `yaml:"description"`
-	Methods     []Method `yaml:"methods,omitempty"`
+	Description string    `yaml:"description"`
+	Methods     []*Method `yaml:"methods,omitempty"`
 }
