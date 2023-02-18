@@ -1,0 +1,5 @@
+{{define "params"}}{{range .Params}}{{printf ", %s %s" .Name .Type}}{{end}}{{end}}
+
+{{define "returns"}}{{$count := len .Returns}}{{if eq $count 1}}{{printf " %s" (index .Returns 0).Type}}{{else if gt $count 1}} ({{range $index, $el := .Returns}}{{if ne $index 0}}, {{end}}{{printf "%s" .Type}}{{end}}){{end}}{{end}}
+
+{{define "method_comment"}}{{if ne .Description ""}}// {{.Description}}{{end}}{{end}}

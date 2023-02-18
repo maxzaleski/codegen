@@ -2,22 +2,24 @@ package core
 
 type Spec struct {
 	// Represents the global configuration.
-	GlobalConfig *GlobalConfig
+	Global *GlobalConfig
 	// Represents the packages to be generated.
 	Pkgs []*Pkg
+	// Represents the .codegen path.
+
+	DirPath string
+	Cwd     string
 }
 
 type GlobalConfig struct {
-	CommentPrefix string `yaml:"comment-prefix"`
-	Pkg           *GCPkg `yaml:"pkg"`
+	Pkg *GCPkg `yaml:"pkg"`
 }
 
 type GCPkg struct {
-	Extension       string    `yaml:"extension"`
-	BasePath        string    `yaml:"base-path"`
-	ServiceLayer    *Layer    `yaml:"service,omitempty"`
-	RepositoryLayer *Layer    `yaml:"repository,omitempty"`
-	Plugins         []*Plugin `yaml:"addons"`
+	Extension string    `yaml:"extension"`
+	Output    string    `yaml:"output"`
+	Layers    []*Layer  `yaml:"layers"`
+	Plugins   []*Plugin `yaml:"addons"`
 }
 
 type Plugin struct {
@@ -28,15 +30,17 @@ type Plugin struct {
 }
 
 type Layer struct {
-	FileName      string         `yaml:"file-name"`
-	Template      string         `yaml:"template"`
-	AlwaysInclude *AlwaysInclude `yaml:"always-include,omitempty"`
+	Name     string `yaml:"name"`
+	FileName string `yaml:"file-name"`
+	Template string `yaml:"template"`
 }
 
-type AlwaysInclude struct {
-	Params  []*Argument       `yaml:"params,omitempty"`
-	Returns []*ReturnArgument `yaml:"returns,omitempty"`
-}
+type LayerID string
+
+const (
+	LayerIDService    LayerID = "service"
+	LayerIDRepository LayerID = "repository"
+)
 
 type Argument struct {
 	Name  string `yaml:"name"`
@@ -96,6 +100,33 @@ type Method struct {
 	EntityWithScope `yaml:",inline"`
 	Params          []*Argument       `yaml:"params,omitempty"`
 	Returns         []*ReturnArgument `yaml:"returns,omitempty"`
+}
+
+func (m *Method) SortArguments() {
+	m.Params = m.sortArguments(m.Params)
+	m.Returns = m.sortArguments(m.Returns)
+}
+
+func (m *Method) sortArguments(args []*Argument) []*Argument {
+	if len(args) == 0 {
+		return args
+	}
+
+	n := len(args)
+	swapped := true
+
+	// Optimised bubble sort as we expect a small number of arguments.
+	for swapped {
+		swapped = false
+		for i := 1; i < n; i++ {
+			if args[i-1].Index > args[i].Index {
+				args[i-1], args[i] = args[i], args[i-1]
+				swapped = true
+			}
+		}
+		n--
+	}
+	return args
 }
 
 type Interface struct {

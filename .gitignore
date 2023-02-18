@@ -1,4 +1,5 @@
 .codegen
+.DS_Store
 
 sandbox/
 .vscode/

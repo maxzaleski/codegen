@@ -10,25 +10,30 @@ import (
 )
 
 // NewSpec parses the .codegen directory and returns a `Spec`.
-func NewSpec() (*Spec, error) {
-	root, err := os.Getwd()
+func NewSpec(loc string) (*Spec, error) {
+	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, err
 	}
-	root += "/.codegen"
-	if _, err := os.Stat(root); os.IsNotExist(err) {
+	if loc != "" {
+		cwd += "/" + loc
+	}
+	dirPath := cwd + "/.codegen"
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
 		return nil, errors.New("missing .codegen directory")
 	}
 
 	spec := &Spec{
-		GlobalConfig: &GlobalConfig{},
-		Pkgs:         make([]*Pkg, 0),
+		Global:  &GlobalConfig{},
+		Pkgs:    make([]*Pkg, 0),
+		Cwd:     cwd,
+		DirPath: dirPath,
 	}
-	if err := unmarshal(root+"/config.yaml", spec.GlobalConfig, true); err != nil {
+	if err := unmarshal(dirPath+"/config.yaml", spec.Global, true); err != nil {
 		return nil, err
 	}
 	// Parse all packages.
-	err = filepath.Walk(root+"/pkg", func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(dirPath+"/pkg", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -47,6 +52,8 @@ func NewSpec() (*Spec, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Order arguments by index.
+	sortArguments(spec.Pkgs)
 
 	return spec, nil
 }
@@ -63,4 +70,17 @@ func unmarshal(path string, dest interface{}, presence bool) error {
 		return fmt.Errorf("core.unmarshal: %w", err)
 	}
 	return nil
+}
+
+func sortArguments(pkgs []*Pkg) {
+	for _, pkg := range pkgs {
+		for _, m := range pkg.Models {
+			for _, fn := range m.Methods {
+				fn.SortArguments()
+			}
+		}
+		for _, fn := range pkg.Interface.Methods {
+			fn.SortArguments()
+		}
+	}
 }
