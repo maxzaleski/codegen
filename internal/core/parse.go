@@ -24,10 +24,12 @@ func NewSpec(loc string) (*Spec, error) {
 	}
 
 	spec := &Spec{
-		Global:  &GlobalConfig{},
-		Pkgs:    make([]*Pkg, 0),
-		Cwd:     cwd,
-		DirPath: dirPath,
+		Global: &GlobalConfig{},
+		Pkgs:   make([]*Pkg, 0),
+		Paths: &SpecPaths{
+			Cwd:     cwd,
+			DirPath: dirPath,
+		},
 	}
 	if err := unmarshal(dirPath+"/config.yaml", spec.Global, true); err != nil {
 		return nil, err

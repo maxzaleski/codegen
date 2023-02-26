@@ -19,8 +19,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := gen.Execute(spec); err != nil {
+	if metrics, err := gen.Execute(spec); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
+	} else {
+		for _, pkg := range metrics.Keys() {
+			for _, mst := range metrics.Get(pkg) {
+				msg := "ignored"
+				if mst.Created {
+					msg = "added"
+				}
+				fmt.Printf("%s/%s: %s\n", pkg, mst.File, msg)
+			}
+		}
 	}
 }

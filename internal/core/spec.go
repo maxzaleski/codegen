@@ -5,10 +5,15 @@ type Spec struct {
 	Global *GlobalConfig
 	// Represents the packages to be generated.
 	Pkgs []*Pkg
-	// Represents the .codegen path.
 
+	Paths *SpecPaths
+}
+
+type SpecPaths struct {
+	// Location of the '.codegen' directory.
 	DirPath string
-	Cwd     string
+	// Location of the current working directory.
+	Cwd string
 }
 
 type GlobalConfig struct {
