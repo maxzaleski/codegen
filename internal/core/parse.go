@@ -47,6 +47,19 @@ func NewSpec(loc string) (*Spec, error) {
 		if err := unmarshal(path, pkg, false); err != nil {
 			return errors.WithStack(err)
 		}
+		// Order method arguments by `index` field.
+		if len(pkg.Models) != 0 {
+			for _, m := range pkg.Models {
+				if len(m.Methods) != 0 {
+					for _, fn := range m.Methods {
+						fn.SortArguments()
+					}
+				}
+			}
+			for _, fn := range pkg.Interface.Methods {
+				fn.SortArguments()
+			}
+		}
 		spec.Pkgs = append(spec.Pkgs, pkg)
 
 		return nil
@@ -54,8 +67,6 @@ func NewSpec(loc string) (*Spec, error) {
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	// Order arguments by index.
-	sortArguments(spec.Pkgs)
 
 	return spec, nil
 }
@@ -72,20 +83,4 @@ func unmarshal(path string, dest interface{}, presence bool) error {
 		return fmt.Errorf("core.unmarshal: %w", err)
 	}
 	return nil
-}
-
-func sortArguments(pkgs []*Pkg) {
-	for _, pkg := range pkgs {
-		for _, m := range pkg.Models {
-			if len(m.Methods) == 0 {
-				continue
-			}
-			for _, fn := range m.Methods {
-				fn.SortArguments()
-			}
-		}
-		for _, fn := range pkg.Interface.Methods {
-			fn.SortArguments()
-		}
-	}
 }
