@@ -21,23 +21,16 @@ type GlobalConfig struct {
 }
 
 type GCPkg struct {
-	Extension string    `yaml:"extension"`
-	Output    string    `yaml:"output"`
-	Layers    []*Layer  `yaml:"layers"`
-	Plugins   []*Plugin `yaml:"addons"`
-}
-
-type Plugin struct {
-	Name       string               `yaml:"name"`
-	Template   string               `yaml:"template"`
-	FileSuffix string               `yaml:"file-suffix"`
-	On         []*PluginApplication `yaml:"on,omitempty"`
+	Extension string   `yaml:"extension"`
+	Output    string   `yaml:"output"`
+	Layers    []*Layer `yaml:"layers"`
 }
 
 type Layer struct {
-	Name     string `yaml:"name"`
-	FileName string `yaml:"file-name"`
-	Template string `yaml:"template"`
+	Name          string `yaml:"name"`
+	FileName      string `yaml:"file-name"`
+	Template      string `yaml:"template"`
+	DisableEmbeds bool   `yaml:"disable-embeds"`
 }
 
 type LayerID string

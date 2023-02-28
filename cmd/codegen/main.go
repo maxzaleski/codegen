@@ -29,7 +29,7 @@ func main() {
 				if mst.Created {
 					msg = "added"
 				}
-				fmt.Printf("%s/%s: %s\n", pkg, mst.File, msg)
+				fmt.Printf("%s/%s: %s\n", pkg, mst.Key, msg)
 			}
 		}
 	}

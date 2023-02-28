@@ -15,8 +15,8 @@ const EmbedsPfx = "_embeds"
 // SpecPfx is the prefix used to retrieve internal templates from the spec file.
 const SpecPfx = "presets"
 
-// GetTemplateFS returns the template FS for the given extension.
-func GetTemplateFS(ext string) (fs embed.FS, err error) {
+// GetFileSystem returns the template file system for the given extension.
+func GetFileSystem(ext string) (fs embed.FS, err error) {
 	switch ext {
 	case "go":
 		fs = goTemplates

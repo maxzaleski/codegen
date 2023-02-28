@@ -3,8 +3,11 @@ package gen
 import "sync"
 
 type (
+	// Metrics represents the generation metrics.
 	Metrics interface {
+		// Keys returns the list of package names for which metrics have been recorded.
 		Keys() []string
+		// Get returns the list of measurements for the specified package.
 		Get(key string) []*measurement
 	}
 
@@ -13,21 +16,20 @@ type (
 
 		seen map[string][]*measurement
 	}
-)
 
-type measurement struct {
-	File    string
-	Created bool
-}
+	measurement struct {
+		Key     string
+		Created bool
+	}
+)
 
 var _ Metrics = (*metrics)(nil)
 
-// Measure reports the metrics for the specified package.
-func (m *metrics) Measure(pkg string, mr *measurement) {
+func (m *metrics) Measure(pkg string, mrt *measurement) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.seen[pkg] = append(m.seen[pkg], mr)
+	m.seen[pkg] = append(m.seen[pkg], mrt)
 }
 
 func (m *metrics) Keys() []string {

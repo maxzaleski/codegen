@@ -1,11 +1,11 @@
 package core
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 )
 
@@ -20,7 +20,7 @@ func NewSpec(loc string) (*Spec, error) {
 	}
 	dirPath := cwd + "/.codegen"
 	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
-		return nil, errors.New("missing .codegen directory")
+		return nil, errors.WithStack(errors.New("missing .codegen directory"))
 	}
 
 	spec := &Spec{
@@ -32,12 +32,12 @@ func NewSpec(loc string) (*Spec, error) {
 		},
 	}
 	if err := unmarshal(dirPath+"/config.yaml", spec.Global, true); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	// Parse all packages.
 	err = filepath.Walk(dirPath+"/pkg", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if filepath.Ext(path) != ".yaml" {
 			return nil
@@ -45,14 +45,14 @@ func NewSpec(loc string) (*Spec, error) {
 
 		pkg := &Pkg{}
 		if err := unmarshal(path, pkg, false); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		spec.Pkgs = append(spec.Pkgs, pkg)
 
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	// Order arguments by index.
 	sortArguments(spec.Pkgs)
@@ -77,6 +77,9 @@ func unmarshal(path string, dest interface{}, presence bool) error {
 func sortArguments(pkgs []*Pkg) {
 	for _, pkg := range pkgs {
 		for _, m := range pkg.Models {
+			if len(m.Methods) == 0 {
+				continue
+			}
 			for _, fn := range m.Methods {
 				fn.SortArguments()
 			}

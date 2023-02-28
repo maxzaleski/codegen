@@ -15,42 +15,54 @@ import (
 )
 
 type layerGenerator struct {
-	*generatorState
+	*state
 
 	pkg     *core.Pkg
 	fileExt string
 }
 
-func (lg *layerGenerator) Execute(_ context.Context, l *core.Layer) error {
+func (lg *layerGenerator) Execute(ctx context.Context, l *core.Layer) error {
+	// [1] Check for the presence of the layer file.
+	//
+	// The aim is not to overwrite existing files.
 	fileName := fmt.Sprintf("%s.%s", l.FileName, lg.fileExt)
 	destPath := fmt.Sprintf("%s/%s/%s", lg.paths.OutputPath, lg.pkg.Name, fileName)
-
-	// We only care to continue if the file doesn't exist.
 	if _, err := os.Stat(destPath); err != nil {
 		if !os.IsNotExist(err) {
-			return errors.WithMessagef(err, "failed to check presence of layer file '%s'", l.FileName)
+			return errors.Wrapf(err, "failed to check presence of layer file '%s'", l.FileName)
 		}
 	} else {
-		lg.metrics.Measure(lg.pkg.Name, &measurement{File: fileName, Created: false})
+		lg.metrics.Measure(lg.pkg.Name, &measurement{Key: fileName, Created: false})
 		return nil
 	}
 
-	// /!\
-	// The first [0] template must be the primary template (the one rendered).
+	// The first template must always be the primary template.
+	//
+	// We instantiate the slice with a single element to ensure that the primary template is always
+	// the first element; the second being the embeds template if available.
 	tmpls := make([]string, 1, 2)
 
-	fs, err := presets.GetTemplateFS(lg.fileExt)
+	fs, err := presets.GetFileSystem(lg.fileExt)
 	if err != nil {
-		return errors.WithMessagef(err, "failed to get template FS")
-	}
-	embedsTmpl, err := lg.checkEmbeds(fs)
-	if err != nil {
-		return err
-	}
-	if embedsTmpl != "" {
-		tmpls = append(tmpls, embedsTmpl)
+		return errors.Wrapf(err, "failed to get template FS")
 	}
 
+	// [2] Check for the presence of the embeds template.
+	//
+	// This template is used to provide utility functions/layouts (via the "template" keyword) to the
+	// primary template. The tool aims to package these utilities by default if available.
+	if !l.DisableEmbeds {
+		embedsTmpl, err := lg.checkEmbeds(fs)
+		if err != nil {
+			return err
+		}
+		if embedsTmpl != "" {
+			tmpls = append(tmpls, embedsTmpl)
+		}
+	}
+	// [3] Parse the various templates into a single executable template set.
+	//
+	// The use of internal templates is determined by the presence of the "preset." prefix.
 	var ts *template.Template
 	if tmpl := l.Template; strings.HasPrefix(tmpl, presets.SpecPfx+".") {
 		tmpl = strings.TrimPrefix(tmpl, presets.SpecPfx+".")
@@ -61,11 +73,11 @@ func (lg *layerGenerator) Execute(_ context.Context, l *core.Layer) error {
 	if err != nil {
 		return err
 	}
-
+	// [4] Execute the template set.
 	if err := lg.write(ts, destPath); err != nil {
 		return err
 	}
-	lg.metrics.Measure(lg.pkg.Name, &measurement{File: fileName, Created: true})
+	lg.metrics.Measure(lg.pkg.Name, &measurement{Key: fileName, Created: true})
 
 	return nil
 }
@@ -76,22 +88,23 @@ func (lg *layerGenerator) viaCustom(fs embed.FS, tmpl string, tmpls []string) (*
 
 	ts, err := template.ParseFiles(tmpls[0])
 	if err != nil {
-		return nil, errors.WithMessage(err, "viaCustom: failed to parse local templates")
+		return nil, errors.Wrap(err, "viaCustom: failed to parse local templates")
 	}
 	ts, err = ts.ParseFS(fs, tmpls[1])
 	if err != nil {
-		return nil, errors.WithMessage(err, "viaCustom: failed to parse embeds template")
+		return nil, errors.Wrap(err, "viaCustom: failed to parse embeds template")
 	}
 
 	return ts, nil
 }
 
-// viaPreset returns a template set with the specified preset.
+// viaPreset returns a template set with the specified preset template.
 func (lg *layerGenerator) viaPreset(fs embed.FS, tmpl string, tmpls []string) (*template.Template, error) {
 	tmpls[0] = fmt.Sprintf("templates/%s/%s.tmpl", lg.fileExt, tmpl)
 	ts, err := template.ParseFS(fs, tmpls...)
 	if err != nil {
-		return nil, errors.WithMessage(err, "viaPreset: failed to parse templates")
+		return nil, errors.Wrapf(err,
+			"viaPreset: failed to parse templates '[%s]'", strings.Join(tmpls, ", "))
 	}
 	return ts, nil
 }
@@ -100,10 +113,10 @@ func (lg *layerGenerator) viaPreset(fs embed.FS, tmpl string, tmpls []string) (*
 func (lg *layerGenerator) write(ts *template.Template, dest string) error {
 	var buf bytes.Buffer
 	if err := ts.Execute(&buf, lg.pkg); err != nil {
-		return errors.WithMessage(err, "failed to execute template")
+		return errors.Wrapf(err, "failed to execute template '%s'", ts.Name())
 	}
 	if err := createFile(dest, bytes.TrimSpace(buf.Bytes())); err != nil {
-		return errors.WithMessagef(err, "failed to create layer file at '%s'", dest)
+		return err
 	}
 	return nil
 }
@@ -114,7 +127,7 @@ func (lg *layerGenerator) write(ts *template.Template, dest string) error {
 func (lg *layerGenerator) checkEmbeds(fs embed.FS) (string, error) {
 	path := fmt.Sprintf("templates/%s/%s.tmpl", lg.fileExt, presets.EmbedsPfx)
 	if b, err := fs.ReadFile(path); err != nil {
-		return "", errors.WithMessage(err, "failed to read embeds template")
+		return "", errors.Wrapf(err, "failed to read '%s' template", presets.EmbedsPfx)
 	} else if len(b) == 0 {
 		return "", nil
 	}
