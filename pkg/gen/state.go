@@ -15,8 +15,8 @@ type state struct {
 type paths struct {
 	// CodegenPath is the path to the `.codegen` directory.
 	CodegenPath string
-	// OutputPath is the path to the output directory.
-	OutputPath string
+	// PkgOutPath is the path to the output directory hosting the generated packages.
+	PkgOutPath string
 }
 
 const stateInContextKey internal.ContextKey = "gen_state"

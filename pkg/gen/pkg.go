@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/codegen/internal/core"
+	"github.com/codegen/internal/fs"
 	"github.com/pkg/errors"
 )
 
@@ -24,14 +25,16 @@ func (g *pkgGenerator) Execute(ctx context.Context, pkg *core.Pkg) {
 	state := getStateFromContext(ctx)
 
 	// Check the presence of the specified package directory.
-	pkgPath := state.paths.OutputPath + "/" + pkg.Name
+	pkgPath := state.paths.PkgOutPath + "/" + pkg.Name
 	if _, err := os.Stat(pkgPath); err != nil {
 		if !(os.IsNotExist(err)) {
 			g.error(err, "failed to check presence of pkg directory '%s'", pkg.Name)
 			return
 		}
 		// If the directory doesn't exist, create it.
-		os.Mkdir(pkgPath, 0777)
+		if err := fs.CreateDir(pkgPath); err != nil {
+			g.error(err, "")
+		}
 	}
 
 	fileExt := g.ext
@@ -39,7 +42,7 @@ func (g *pkgGenerator) Execute(ctx context.Context, pkg *core.Pkg) {
 		fileExt = e
 	}
 
-	// Generate each layer.
+	// Execute each layer.
 	lg := &layerGenerator{
 		state:   state,
 		pkg:     pkg,
@@ -56,7 +59,7 @@ func (g *pkgGenerator) Execute(ctx context.Context, pkg *core.Pkg) {
 func (pg *pkgGenerator) error(err error, msg string, args ...interface{}) {
 	if len(args) > 0 {
 		err = errors.Wrapf(err, msg, args...)
-	} else {
+	} else if msg != "" {
 		err = errors.Wrap(err, msg)
 	}
 	pg.errChan <- err

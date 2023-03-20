@@ -2,19 +2,18 @@ package gen
 
 import (
 	"context"
-	"fmt"
-	"os"
 	"sync"
 
 	"github.com/codegen/internal/core"
+	"github.com/codegen/internal/fs"
 )
 
 // Execute generates the code for the given spec.
-func Execute(spec *core.Spec) (_ Metrics, err error) {
+func Execute(spec *core.Spec, debug int) (_ Metrics, err error) {
 	// Create the output directory if it doesn't exist.
 	outPath := spec.Paths.Cwd + "/" + spec.Global.Pkg.Output
-	if _, err := os.Stat(outPath); os.IsNotExist(err) {
-		os.Mkdir(outPath, 0777)
+	if err := fs.CreateDirINE(outPath); err != nil {
+		return nil, err
 	}
 
 	wg := &sync.WaitGroup{}
@@ -34,12 +33,12 @@ func Execute(spec *core.Spec) (_ Metrics, err error) {
 
 	ms := &metrics{
 		mu:   &sync.Mutex{},
-		seen: make(map[string][]*measurement),
+		seen: make(map[string][]*Measurement),
 	}
 	ctx = context.WithValue(ctx, stateInContextKey, &state{
 		paths: &paths{
 			CodegenPath: spec.Paths.DirPath,
-			OutputPath:  outPath,
+			PkgOutPath:  outPath,
 		},
 		metrics: ms,
 	})
@@ -59,11 +58,6 @@ func Execute(spec *core.Spec) (_ Metrics, err error) {
 	}
 	wg.Wait()
 	close(errChan)
-
-	// Create error log file.
-	if err != nil {
-		createFile(spec.Paths.Cwd+"/codegen_error.log", []byte(fmt.Sprintf("%+v", err)))
-	}
 
 	return ms, err
 }

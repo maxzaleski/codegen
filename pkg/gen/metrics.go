@@ -8,16 +8,16 @@ type (
 		// Keys returns the list of package names for which metrics have been recorded.
 		Keys() []string
 		// Get returns the list of measurements for the specified package.
-		Get(key string) []*measurement
+		Get(key string) []*Measurement
 	}
 
 	metrics struct {
 		mu *sync.Mutex
 
-		seen map[string][]*measurement
+		seen map[string][]*Measurement
 	}
 
-	measurement struct {
+	Measurement struct {
 		Key     string
 		Created bool
 	}
@@ -25,7 +25,7 @@ type (
 
 var _ Metrics = (*metrics)(nil)
 
-func (m *metrics) Measure(pkg string, mrt *measurement) {
+func (m *metrics) Measure(pkg string, mrt *Measurement) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -43,7 +43,7 @@ func (m *metrics) Keys() []string {
 	return keys
 }
 
-func (m *metrics) Get(key string) []*measurement {
+func (m *metrics) Get(key string) []*Measurement {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

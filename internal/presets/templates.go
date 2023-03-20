@@ -2,7 +2,8 @@ package presets
 
 import (
 	"embed"
-	"fmt"
+
+	"github.com/pkg/errors"
 )
 
 //go:embed templates/go/*.tmpl
@@ -15,13 +16,13 @@ const EmbedsPfx = "_embeds"
 // SpecPfx is the prefix used to retrieve internal templates from the spec file.
 const SpecPfx = "presets"
 
-// GetFileSystem returns the template file system for the given extension.
-func GetFileSystem(ext string) (fs embed.FS, err error) {
+// GetFS returns the template file system for the given extension.
+func GetFS(ext string) (fs embed.FS, err error) {
 	switch ext {
 	case "go":
 		fs = goTemplates
 	default:
-		err = fmt.Errorf("unsupported template extension: '%s'", ext)
+		err = errors.Wrapf(err, "unsupported template extension: '%s'", ext)
 	}
 	return
 }

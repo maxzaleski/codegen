@@ -10,6 +10,7 @@ import (
 	"text/template"
 
 	"github.com/codegen/internal/core"
+	"github.com/codegen/internal/fs"
 	"github.com/codegen/internal/presets"
 	"github.com/pkg/errors"
 )
@@ -26,13 +27,13 @@ func (lg *layerGenerator) Execute(ctx context.Context, l *core.Layer) error {
 	//
 	// The aim is not to overwrite existing files.
 	fileName := fmt.Sprintf("%s.%s", l.FileName, lg.fileExt)
-	destPath := fmt.Sprintf("%s/%s/%s", lg.paths.OutputPath, lg.pkg.Name, fileName)
+	destPath := fmt.Sprintf("%s/%s/%s", lg.paths.PkgOutPath, lg.pkg.Name, fileName)
 	if _, err := os.Stat(destPath); err != nil {
 		if !os.IsNotExist(err) {
 			return errors.Wrapf(err, "failed to check presence of layer file '%s'", l.FileName)
 		}
 	} else {
-		lg.metrics.Measure(lg.pkg.Name, &measurement{Key: fileName, Created: false})
+		lg.metrics.Measure(lg.pkg.Name, &Measurement{Key: fileName, Created: false})
 		return nil
 	}
 
@@ -42,9 +43,9 @@ func (lg *layerGenerator) Execute(ctx context.Context, l *core.Layer) error {
 	// the first element; the second being the embeds template if available.
 	tmpls := make([]string, 1, 2)
 
-	fs, err := presets.GetFileSystem(lg.fileExt)
+	fs, err := presets.GetFS(lg.fileExt)
 	if err != nil {
-		return errors.Wrapf(err, "failed to get template FS")
+		return errors.WithMessage(err, "failed to get template FS")
 	}
 
 	// [2] Check for the presence of the embeds template.
@@ -66,9 +67,9 @@ func (lg *layerGenerator) Execute(ctx context.Context, l *core.Layer) error {
 	var ts *template.Template
 	if tmpl := l.Template; strings.HasPrefix(tmpl, presets.SpecPfx+".") {
 		tmpl = strings.TrimPrefix(tmpl, presets.SpecPfx+".")
-		ts, err = lg.viaPreset(fs, tmpl, tmpls)
+		ts, err = lg.withPresetTmpl(fs, tmpl, tmpls)
 	} else {
-		ts, err = lg.viaCustom(fs, tmpl, tmpls)
+		ts, err = lg.withCustomTmpl(fs, tmpl, tmpls)
 	}
 	if err != nil {
 		return err
@@ -77,34 +78,34 @@ func (lg *layerGenerator) Execute(ctx context.Context, l *core.Layer) error {
 	if err := lg.write(ts, destPath); err != nil {
 		return err
 	}
-	lg.metrics.Measure(lg.pkg.Name, &measurement{Key: fileName, Created: true})
+	lg.metrics.Measure(lg.pkg.Name, &Measurement{Key: fileName, Created: true})
 
 	return nil
 }
 
 // viaPreset returns a template set with the specified local template.
-func (lg *layerGenerator) viaCustom(fs embed.FS, tmpl string, tmpls []string) (*template.Template, error) {
+func (lg *layerGenerator) withCustomTmpl(fs embed.FS, tmpl string, tmpls []string) (*template.Template, error) {
 	tmpls[0] = fmt.Sprintf("%s/templates/%s.tmpl", lg.paths.CodegenPath, tmpl)
 
 	ts, err := template.ParseFiles(tmpls[0])
 	if err != nil {
-		return nil, errors.Wrap(err, "viaCustom: failed to parse local templates")
+		return nil, errors.Wrap(err, "failed to parse local template")
 	}
 	ts, err = ts.ParseFS(fs, tmpls[1])
 	if err != nil {
-		return nil, errors.Wrap(err, "viaCustom: failed to parse embeds template")
+		return nil, errors.Wrap(err, "failed to parse embeds template")
 	}
 
 	return ts, nil
 }
 
-// viaPreset returns a template set with the specified preset template.
-func (lg *layerGenerator) viaPreset(fs embed.FS, tmpl string, tmpls []string) (*template.Template, error) {
+// withPresetTmpl returns a template set with the specified preset template.
+func (lg *layerGenerator) withPresetTmpl(fs embed.FS, tmpl string, tmpls []string) (*template.Template, error) {
 	tmpls[0] = fmt.Sprintf("templates/%s/%s.tmpl", lg.fileExt, tmpl)
 	ts, err := template.ParseFS(fs, tmpls...)
 	if err != nil {
 		return nil, errors.Wrapf(err,
-			"viaPreset: failed to parse templates '[%s]'", strings.Join(tmpls, ", "))
+			"failed to parse templates '[%s]'", strings.Join(tmpls, ", "))
 	}
 	return ts, nil
 }
@@ -115,7 +116,7 @@ func (lg *layerGenerator) write(ts *template.Template, dest string) error {
 	if err := ts.Execute(&buf, lg.pkg); err != nil {
 		return errors.Wrapf(err, "failed to execute template '%s'", ts.Name())
 	}
-	if err := createFile(dest, bytes.TrimSpace(buf.Bytes())); err != nil {
+	if err := fs.CreateFile(dest, bytes.TrimSpace(buf.Bytes())); err != nil {
 		return err
 	}
 	return nil

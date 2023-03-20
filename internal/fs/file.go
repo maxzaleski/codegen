@@ -1,4 +1,4 @@
-package gen
+package fs
 
 import (
 	"os"
@@ -6,8 +6,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// createFile creates a file at the specified destination and writes the given bytes to it.
-func createFile(dest string, b []byte) error {
+// CreateFile creates a file at the specified destination and writes the given bytes to it.
+func CreateFile(dest string, b []byte) error {
 	f, err := os.Create(dest)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create file at '%s'", dest)
