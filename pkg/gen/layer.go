@@ -23,17 +23,20 @@ type layerGenerator struct {
 }
 
 func (lg *layerGenerator) Execute(ctx context.Context, l *core.Layer) error {
+	fileName := fmt.Sprintf("%s.%s", l.FileName, lg.fileExt)
+	destPath := fmt.Sprintf("%s/%s/%s", lg.paths.PkgOutPath, lg.pkg.Name, fileName)
+
+	mi := lg.metrics.NewIntent(lg.pkg.Name, &Measurement{FileName: l.Name, Path: destPath})
+
 	// [1] Check for the presence of the layer file.
 	//
 	// The aim is not to overwrite existing files.
-	fileName := fmt.Sprintf("%s.%s", l.FileName, lg.fileExt)
-	destPath := fmt.Sprintf("%s/%s/%s", lg.paths.PkgOutPath, lg.pkg.Name, fileName)
 	if _, err := os.Stat(destPath); err != nil {
 		if !os.IsNotExist(err) {
 			return errors.Wrapf(err, "failed to check presence of layer file '%s'", l.FileName)
 		}
 	} else {
-		lg.metrics.Measure(lg.pkg.Name, &Measurement{Key: fileName, Created: false})
+		mi.Measure(&Measurement{Created: false})
 		return nil
 	}
 
@@ -78,7 +81,7 @@ func (lg *layerGenerator) Execute(ctx context.Context, l *core.Layer) error {
 	if err := lg.write(ts, destPath); err != nil {
 		return err
 	}
-	lg.metrics.Measure(lg.pkg.Name, &Measurement{Key: fileName, Created: true})
+	mi.Measure(&Measurement{Created: true})
 
 	return nil
 }

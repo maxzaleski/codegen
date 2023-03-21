@@ -30,14 +30,14 @@ func NewSpec(loc string) (*Spec, error) {
 
 	// Parse generator specification.
 	spec := &Spec{
-		Global: &GlobalConfig{},
+		Config: &CoreConfig{},
 		Pkgs:   make([]*Pkg, 0),
-		Paths: &SpecPaths{
+		Metadata: &Metadata{
 			Cwd:     cwd,
 			DirPath: cfgDirPath,
 		},
 	}
-	if err := unmarshal(cfgDirPath+"/config.yaml", spec.Global, true); err != nil {
+	if err := unmarshal(cfgDirPath+"/config.yaml", spec.Config, true); err != nil {
 		return nil, err
 	}
 

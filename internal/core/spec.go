@@ -1,26 +1,27 @@
 package core
 
 type Spec struct {
-	// Represents the global configuration.
-	Global *GlobalConfig
+	// Represents the package configuration.
+	Config *CoreConfig
 	// Represents the packages to be generated.
 	Pkgs []*Pkg
-
-	Paths *SpecPaths
+	// Represents the metadata of the current generation.
+	Metadata *Metadata
 }
 
-type SpecPaths struct {
+// GetOutPath returns the absolute path of the final output directory.
+func (s *Spec) GetOutPath() string {
+	return s.Metadata.Cwd + "/" + s.Config.Output
+}
+
+type Metadata struct {
 	// Location of the '.codegen' directory.
 	DirPath string
 	// Location of the current working directory.
 	Cwd string
 }
 
-type GlobalConfig struct {
-	Pkg *GCPkg `yaml:"pkg"`
-}
-
-type GCPkg struct {
+type CoreConfig struct {
 	Extension string   `yaml:"extension"`
 	Output    string   `yaml:"output"`
 	Layers    []*Layer `yaml:"layers"`

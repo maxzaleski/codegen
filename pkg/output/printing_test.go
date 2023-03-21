@@ -2,12 +2,13 @@ package output
 
 import (
 	"testing"
+	"time"
 
 	"github.com/pkg/errors"
 )
 
 func TestOutput(t *testing.T) {
-	t.Skip("Visual inspection only")
+	// t.Skip("Visual inspection only")
 
 	t.Run("package", func(t *testing.T) {
 		Package("foobar")
@@ -22,11 +23,11 @@ func TestOutput(t *testing.T) {
 	})
 
 	t.Run("report", func(t *testing.T) {
-		Report(4, 2)
+		Report(time.Now(), 4, 2)
 	})
 
 	t.Run("report none generated", func(t *testing.T) {
-		Report(0, 2)
+		Report(time.Now(), 0, 2)
 	})
 
 	t.Run("info", func(t *testing.T) {

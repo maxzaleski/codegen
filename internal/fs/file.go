@@ -17,3 +17,13 @@ func CreateFile(dest string, b []byte) error {
 	}
 	return nil
 }
+
+// FileExists returns true if the file at the given path exists.
+func FileExists(path string) bool {
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return false
+		}
+	}
+	return true
+}

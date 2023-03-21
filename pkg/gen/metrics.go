@@ -18,18 +18,38 @@ type (
 	}
 
 	Measurement struct {
-		Key     string
-		Created bool
+		FileName string
+		Path     string
+		Created  bool
 	}
 )
 
 var _ Metrics = (*metrics)(nil)
 
-func (m *metrics) Measure(pkg string, mrt *Measurement) {
+// newMetrics returns a new metrics instance.
+func newMetrics(seen map[string][]*Measurement) *metrics {
+	if seen == nil {
+		seen = make(map[string][]*Measurement)
+	}
+	return &metrics{
+		mu:   &sync.Mutex{},
+		seen: seen,
+	}
+}
+
+func (m *metrics) Measure(key string, mrt *Measurement) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.seen[pkg] = append(m.seen[pkg], mrt)
+	m.seen[key] = append(m.seen[key], mrt)
+}
+
+func (m *metrics) NewIntent(key string, mrt *Measurement) *MeasurementIntent {
+	return &MeasurementIntent{
+		mrt:    mrt,
+		key:    key,
+		parent: m,
+	}
 }
 
 func (m *metrics) Keys() []string {
@@ -48,4 +68,20 @@ func (m *metrics) Get(key string) []*Measurement {
 	defer m.mu.Unlock()
 
 	return m.seen[key]
+}
+
+type MeasurementIntent struct {
+	mrt    *Measurement
+	key    string
+	parent *metrics
+}
+
+func (mi *MeasurementIntent) Measure(mrt *Measurement) {
+	if fn := mi.mrt.FileName; fn != "" {
+		mrt.FileName = fn
+	}
+	if path := mi.mrt.Path; path != "" {
+		mrt.Path = path
+	}
+	mi.parent.Measure(mi.key, mrt)
 }

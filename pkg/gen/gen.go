@@ -11,7 +11,7 @@ import (
 // Execute generates the code for the given spec.
 func Execute(spec *core.Spec, debug int) (_ Metrics, err error) {
 	// Create the output directory if it doesn't exist.
-	outPath := spec.Paths.Cwd + "/" + spec.Global.Pkg.Output
+	outPath := spec.GetOutPath()
 	if err := fs.CreateDirINE(outPath); err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func Execute(spec *core.Spec, debug int) (_ Metrics, err error) {
 	}
 	ctx = context.WithValue(ctx, stateInContextKey, &state{
 		paths: &paths{
-			CodegenPath: spec.Paths.DirPath,
+			CodegenPath: spec.Metadata.DirPath,
 			PkgOutPath:  outPath,
 		},
 		metrics: ms,
@@ -48,8 +48,8 @@ func Execute(spec *core.Spec, debug int) (_ Metrics, err error) {
 		wg.Add(1)
 
 		g := &pkgGenerator{
-			ext:    spec.Global.Pkg.Extension,
-			layers: spec.Global.Pkg.Layers,
+			ext:    spec.Config.Extension,
+			layers: spec.Config.Layers,
 
 			wg:      wg,
 			errChan: errChan,
