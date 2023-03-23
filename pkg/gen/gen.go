@@ -19,22 +19,12 @@ func Execute(spec *core.Spec, debug int) (_ Metrics, err error) {
 	wg := &sync.WaitGroup{}
 	errChan := make(chan error, len(spec.Pkgs))
 
+	// Allocate a new (worker) pool with limited seats.
+	// This is to address the potential use case of a large number of packages to parse.
+	pool := newPool(20, wg)
+	ms := newMetrics(nil)
+
 	ctx, cancel := context.WithCancel(context.Background())
-
-	// Listen for the first error if any.
-	go func(errChan <-chan error, cancel func()) {
-		for err = range errChan {
-			if err != nil {
-				cancel()
-				break
-			}
-		}
-	}(errChan, cancel)
-
-	ms := &metrics{
-		mu:   &sync.Mutex{},
-		seen: make(map[string][]*Measurement),
-	}
 	ctx = context.WithValue(ctx, stateInContextKey, &state{
 		paths: &paths{
 			CodegenPath: spec.Metadata.DirPath,
@@ -43,19 +33,33 @@ func Execute(spec *core.Spec, debug int) (_ Metrics, err error) {
 		metrics: ms,
 	})
 
-	// Generate each package concurrently.
-	for _, pkg := range spec.Pkgs {
-		wg.Add(1)
+	// Listen for the first error if any.
+	wg.Add(1)
+	go func(wg *sync.WaitGroup, errChan <-chan error, cancel func()) {
+		defer wg.Done()
 
-		g := &pkgGenerator{
-			ext:    spec.Config.Extension,
-			layers: spec.Config.Layers,
-
-			wg:      wg,
-			errChan: errChan,
+		for err = range errChan {
+			if err != nil {
+				cancel()
+				break
+			}
 		}
-		go g.Execute(ctx, pkg)
+	}(wg, errChan, cancel)
+
+	// Execute package concurrently.
+	g := &pkgGenerator{
+		ext:    spec.Config.Extension,
+		layers: spec.Config.Layers,
+
+		pool:    pool,
+		errChan: errChan,
 	}
+	for _, pkg := range spec.Pkgs {
+		pool.Acquire()
+
+		g.Execute(ctx, pkg)
+	}
+
 	wg.Wait()
 	close(errChan)
 
