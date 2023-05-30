@@ -2,6 +2,8 @@ package gen
 
 import (
 	"context"
+	"github.com/codegen/pkg/slog"
+	"github.com/pkg/errors"
 	"sync"
 
 	"github.com/codegen/internal/core"
@@ -9,47 +11,52 @@ import (
 )
 
 // Execute generates the code for the given spec.
-func Execute(spec *core.Spec, debug int) (_ Metrics, err error) {
-	// Create the output directory if it doesn't exist.
-	outPath := spec.GetOutPath()
-	if err := fs.CreateDirINE(outPath); err != nil {
-		return nil, err
+func Execute(loc string, logger slog.Logger) (md *core.Metadata, _ Metrics, err error) {
+	// Parse configuration via `.codegen` directory.
+	spec, err := core.NewSpec(loc)
+	md = spec.Metadata
+	if err != nil {
+		err = errors.Wrapf(err, "failed to produce a new specification")
+		return
 	}
 
-	wg := &sync.WaitGroup{}
-	errChan := make(chan error, len(spec.Pkgs))
+	// Create the output directory if it doesn't exist.
+	outPath := spec.GetOutPath()
+	if err = fs.CreateDirINE(outPath); err != nil {
+		return
+	}
 
-	// Allocate a new (worker) pool with limited seats.
-	// This is to address the potential use case of a large number of packages to parse.
-	pool := newPool(20, wg)
+	errChan := make(chan error, len(spec.Pkgs))
 	ms := newMetrics(nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx = context.WithValue(ctx, stateInContextKey, &state{
 		paths: &paths{
-			CodegenPath: spec.Metadata.DirPath,
+			CodegenPath: spec.Metadata.DomainDir,
 			PkgOutPath:  outPath,
 		},
 		metrics: ms,
 	})
 
 	// Listen for the first error if any.
-	wg.Add(1)
-	go func(wg *sync.WaitGroup, errChan <-chan error, cancel func()) {
-		defer wg.Done()
-
+	go func(errChan <-chan error, cancel func()) {
 		for err = range errChan {
 			if err != nil {
 				cancel()
 				break
 			}
 		}
-	}(wg, errChan, cancel)
+	}(errChan, cancel)
+
+	wg := &sync.WaitGroup{}
+	// Allocate a new (worker) pool with limited seats.
+	// This is to address the potential use case of a large number of packages to parse.
+	pool := newPool(20, wg)
 
 	// Execute package concurrently.
 	g := &pkgGenerator{
-		ext:    spec.Config.Extension,
-		layers: spec.Config.Layers,
+		ext:  spec.Config.Lang,
+		jobs: spec.Config.Jobs,
 
 		pool:    pool,
 		errChan: errChan,
@@ -61,7 +68,7 @@ func Execute(spec *core.Spec, debug int) (_ Metrics, err error) {
 	}
 
 	wg.Wait()
-	close(errChan)
+	close(errChan) // Consequently, the err-listening goroutine will terminate.
 
-	return ms, err
+	return md, ms, err
 }

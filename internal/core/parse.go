@@ -1,6 +1,7 @@
 package core
 
 import (
+	"github.com/go-playground/validator/v10"
 	"os"
 	"path/filepath"
 
@@ -9,12 +10,16 @@ import (
 )
 
 const (
-	configDir      = ".codegen"
-	configFileName = "config.yaml"
+	DomainDir   = ".codegen"
+	domainEntry = "config.yaml"
 )
 
+var validate = validator.New()
+
 // NewSpec parses the .codegen directory and returns a `Spec`.
-func NewSpec(loc string) (*Spec, error) {
+func NewSpec(loc string) (spec *Spec, err error) {
+	spec = newSpec()
+
 	// Establish presence of configuration directory.
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -23,22 +28,17 @@ func NewSpec(loc string) (*Spec, error) {
 	if loc != "" {
 		cwd += "/" + loc
 	}
-	cfgDirPath := cwd + "/" + configDir
-	if _, err := os.Stat(cfgDirPath); os.IsNotExist(err) {
-		return nil, errors.Wrapf(err, "failed to locate '%s' directory", configDir)
+	cfgDirPath := cwd + "/" + DomainDir
+	if _, err = os.Stat(cfgDirPath); os.IsNotExist(err) {
+		err = errors.Wrapf(err, "failed to locate '%s' directory", DomainDir)
+		return
 	}
+	spec.Metadata.DomainDir = cfgDirPath
+	spec.Metadata.Cwd = cwd
 
 	// Parse generator specification.
-	spec := &Spec{
-		Config: &CoreConfig{},
-		Pkgs:   make([]*Pkg, 0),
-		Metadata: &Metadata{
-			Cwd:     cwd,
-			DirPath: cfgDirPath,
-		},
-	}
-	if err := unmarshal(cfgDirPath+"/config.yaml", spec.Config, true); err != nil {
-		return nil, err
+	if err = unmarshal(cfgDirPath+"/config.yaml", spec.Config, true); err != nil {
+		return
 	}
 
 	// Parse all packages.
@@ -54,7 +54,7 @@ func NewSpec(loc string) (*Spec, error) {
 			return nil
 		}
 
-		pkg := &Pkg{}
+		pkg := &Package{}
 		if err := unmarshal(path, pkg, false); err != nil {
 			return err
 		}
@@ -63,12 +63,12 @@ func NewSpec(loc string) (*Spec, error) {
 			for _, m := range pkg.Models {
 				if len(m.Methods) != 0 {
 					for _, m := range m.Methods {
-						m.SortArguments()
+						m.SortParams()
 					}
 				}
 			}
 			for _, m := range pkg.Interface.Methods {
-				m.SortArguments()
+				m.SortParams()
 			}
 		}
 		spec.Pkgs = append(spec.Pkgs, pkg)
@@ -76,15 +76,21 @@ func NewSpec(loc string) (*Spec, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to walk configuration dir")
+		err = errors.Wrap(err, "failed to walk configuration dir")
+		return
 	}
 
-	return spec, nil
+	// Validate the resulting struct.
+	if err = validate.Struct(spec.Config); err != nil {
+		return
+	}
+
+	return
 }
 
 // unmarshal wraps `yaml.Unmarshal`.
 //
-// `checkPresence` is used to determine whether or not to return an error if the file is not found.
+// `checkPresence` is used to determine whether to return an error if the file is not found.
 func unmarshal(path string, dest interface{}, checkPresence bool) error {
 	bs, err := os.ReadFile(path)
 	if err != nil {

@@ -1,12 +1,23 @@
 package core
 
+import "sort"
+
+// Spec represents the specification for the current generation.
 type Spec struct {
 	// Represents the package configuration.
-	Config *CoreConfig
+	Config *Config
 	// Represents the packages to be generated.
-	Pkgs []*Pkg
+	Pkgs []*Package `validate:"dive"`
 	// Represents the metadata of the current generation.
-	Metadata *Metadata
+	Metadata *Metadata `validate:"required"`
+}
+
+func newSpec() *Spec {
+	return &Spec{
+		Config:   &Config{},
+		Pkgs:     make([]*Package, 0),
+		Metadata: &Metadata{},
+	}
 }
 
 // GetOutPath returns the absolute path of the final output directory.
@@ -14,47 +25,55 @@ func (s *Spec) GetOutPath() string {
 	return s.Metadata.Cwd + "/" + s.Config.Output
 }
 
+// Metadata represents the location metadata for the current generation.
 type Metadata struct {
 	// Location of the '.codegen' directory.
-	DirPath string
+	DomainDir string
 	// Location of the current working directory.
 	Cwd string
 }
 
-type CoreConfig struct {
-	Extension string   `yaml:"extension"`
-	Output    string   `yaml:"output"`
-	Layers    []*Layer `yaml:"layers"`
+// Config represents the configuration for the current generation.
+type Config struct {
+	Lang   string           `yaml:"lang" validate:"lowercase,alpha,lt=5"`
+	Output string           `yaml:"output" validate:"required,dirlike"`
+	Jobs   []*GenerationJob `yaml:"jobs" validate:"dive"`
 }
 
-type Layer struct {
-	Name          string `yaml:"name"`
-	FileName      string `yaml:"file-name"`
-	Template      string `yaml:"template"`
-	DisableEmbeds bool   `yaml:"disable-embeds"`
+// GenerationJob represents a job to be performed for the current generation.
+//
+// Each package runs through the entire list of jobs. To opt out, specify the package name in the `exclude` field.
+type GenerationJob struct {
+	Key           string     `yaml:"name" validate:"required,alpha"`
+	Destination   string     `yaml:"destination" validate:"required,dirlike"`
+	Template      string     `yaml:"template" validate:"required"`
+	Lang          string     `yaml:"lang"  validate:"lowercase,alpha"`
+	DisableEmbeds bool       `yaml:"disable-embeds" validate:"boolean"`
+	Exclude       Exclusions `yaml:"exclude" validate:"omitempty,alpha"`
 }
 
-type LayerID string
+type Exclusions []string
 
-const (
-	LayerIDService    LayerID = "service"
-	LayerIDRepository LayerID = "repository"
-)
-
-type Argument struct {
-	Name  string `yaml:"name"`
-	Type  string `yaml:"type"`
-	Index int8   `yaml:"index"`
+func (e Exclusions) Contains(val string) bool {
+	for _, el := range e {
+		if el == val {
+			return true
+		}
+	}
+	return false
 }
 
-type ReturnArgument = Argument
+// FnParameter represents a function argument.
+type FnParameter struct {
+	Name  string `yaml:"name" validate:"required,alphanum"`
+	Type  string `yaml:"type" validate:"required,alpha"`
+	Index int8   `yaml:"index" validate:"required,number,gt=-1"`
+}
 
-type PluginApplication string
-
-const (
-	AddonApplicationService    PluginApplication = "service"
-	AddonApplicationRepository PluginApplication = "repository"
-)
+// ReturnParameter represents a function's return parameter.
+//
+// Applicable to languages that support multiple values as return arguments.
+type ReturnParameter = FnParameter
 
 type Entity struct {
 	Name        string `yaml:"name"`
@@ -63,10 +82,21 @@ type Entity struct {
 
 type EntityWithScope struct {
 	Entity `yaml:",inline"`
-	Scope  EntityScope `yaml:"scope"`
+	Scope  EntityScope `yaml:"scope" validate:"enum:EntityScope"`
 }
 
 type EntityScope string
+
+func (es EntityScope) IsValid() bool {
+	switch es {
+	case EntityScopeProtected,
+		EntityScopePrivate,
+		EntityScopePublic:
+		return true
+	default:
+		return false
+	}
+}
 
 const (
 	EntityScopePublic    EntityScope = "public"
@@ -74,61 +104,48 @@ const (
 	EntityScopeProtected EntityScope = "protected"
 )
 
-type Pkg struct {
+type Package struct {
 	Entity    `yaml:",inline"`
-	Extension string     `yaml:"extension"`
-	Models    []Model    `yaml:"models,omitempty"`
-	Interface *Interface `yaml:"interface"`
+	Models    []Model    `yaml:"models,omitempty" validate:"dive"`
+	Interface *Interface `yaml:"interface" validate:"dive"`
 }
 
+// Model represents a generic domain model.
 type Model struct {
 	EntityWithScope `yaml:",inline"`
-	Extends         string     `yaml:"extends"`
-	Implements      string     `yaml:"implements"`
-	Properties      []Property `yaml:"props,omitempty"`
-	Methods         []Method   `yaml:"methods,omitempty"`
+	Extends         string          `yaml:"extends"`
+	Implements      string          `yaml:"implements"`
+	Properties      []ModelProperty `yaml:"props,omitempty" validate:"dive"`
+	Methods         []Function      `yaml:"methods,omitempty" validate:"dive"`
 }
 
-type Property struct {
-	EntityWithScope `yaml:",inline"`
-	Type            string                  `yaml:"type"`
+// ModelProperty represents a generic property definition.
+type ModelProperty struct {
+	EntityWithScope `yaml:",inline" validate:"dive"`
+	Type            string                  `yaml:"type" validate:"required,proptype"`
 	Addons          *map[string]interface{} `yaml:"addons,omitempty"`
 }
 
-type Method struct {
+// Function represents a generic function definition.
+type Function struct {
 	EntityWithScope `yaml:",inline"`
-	Params          []*Argument       `yaml:"params,omitempty"`
-	Returns         []*ReturnArgument `yaml:"returns,omitempty"`
+	Params          []*FnParameter     `yaml:"params,omitempty"`
+	Returns         []*ReturnParameter `yaml:"returns,omitempty"`
 }
 
-func (m *Method) SortArguments() {
-	m.Params = m.sortArguments(m.Params)
-	m.Returns = m.sortArguments(m.Returns)
+func (m *Function) SortParams() {
+	m.sort(m.Params)
+	m.sort(m.Returns)
 }
 
-func (m *Method) sortArguments(args []*Argument) []*Argument {
-	if len(args) == 0 {
-		return args
-	}
-
-	n := len(args)
-	swapped := true
-
-	// Optimised bubble sort as we expect a small number of arguments.
-	for swapped {
-		swapped = false
-		for i := 1; i < n; i++ {
-			if args[i-1].Index > args[i].Index {
-				args[i-1], args[i] = args[i], args[i-1]
-				swapped = true
-			}
-		}
-		n--
-	}
-	return args
+func (m *Function) sort(s []*FnParameter) {
+	sort.Slice(s, func(i, j int) bool {
+		return s[i].Index > s[j].Index
+	})
 }
 
+// Interface represents a generic interface definition.
 type Interface struct {
-	Description string    `yaml:"description"`
-	Methods     []*Method `yaml:"methods,omitempty"`
+	Description string      `yaml:"description"`
+	Methods     []*Function `yaml:"methods,omitempty" validate:"dive"`
 }

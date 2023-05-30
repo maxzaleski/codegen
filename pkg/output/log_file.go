@@ -7,14 +7,13 @@ import (
 	"github.com/codegen/internal/fs"
 )
 
-const logFileSuffix = "/codegen_error.log"
+const logFile = "/codegen_error.log"
 
-// WriteToErrorLog appends appends the given error to a log file in the current working directory.
+// WriteToErrorLog appends the given error to a log file in the current working directory.
 //
 // If the file does not exist, WriteToErrorLog will create it.
 func WriteToErrorLog(cwd string, err error) error {
-	dest := cwd + logFileSuffix
-	stackTrace := fmt.Sprintf("%+v", err)
+	dest, stackTrace := cwd+logFile, fmt.Sprintf("%+v", err)
 
 	// Check if the file already exists. If so, append the bytes.
 	if fs.FileExists(dest) {
@@ -22,7 +21,7 @@ func WriteToErrorLog(cwd string, err error) error {
 		if err != nil {
 			return err
 		}
-		defer file.Close()
+		defer func(file *os.File) { _ = file.Close() }(file)
 
 		if _, err = file.Write([]byte("\n\n" + stackTrace)); err != nil {
 			return err

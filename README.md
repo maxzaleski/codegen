@@ -6,7 +6,7 @@ Config is contained within root `.codegen` directory:
 
 - Global config is labeled as `config.yaml`
 - Seperate pkg configs can be defined via `pkg` > `pkg/name.yaml`
-- Seperate template can be defined and specified via `tmpl` > `tmpl/layer_addon.tmpl`
+- Seperate template can be defined and specified via `tmpl` > `tmpl/job_addon.tmpl`
 
 ## Steps of Implementation
 

@@ -44,7 +44,7 @@ func test_setupTestDir(subDir string) (func(), error) {
 	if subDir != "" {
 		wd = subDir + "/"
 	}
-	wd += configDir
+	wd += DomainDir
 
 	pkgDir := wd + "/pkg"
 	if err := os.MkdirAll(pkgDir, 0777); err != nil {
@@ -56,7 +56,7 @@ func test_setupTestDir(subDir string) (func(), error) {
 		data []byte
 	}{
 		{
-			wd + "/" + configFileName,
+			wd + "/" + domainEntry,
 			[]byte(codegenCfg)},
 		{
 			pkgDir + "/test.yaml",
@@ -70,7 +70,7 @@ func test_setupTestDir(subDir string) (func(), error) {
 	}
 
 	reset := func() {
-		from := configDir
+		from := DomainDir
 		if subDir != "" {
 			from = subDir
 		}
@@ -83,7 +83,7 @@ const codegenCfg = `pkg:
   output: pkg
   extension: go
 
-  layers:
+  jobs:
     - name: models 
       file-name: models 
       template: presets.service
@@ -95,7 +95,7 @@ models:
   - name: User
     extends: internal.PublicEntity
     props:
-      - name: Name
+      - name: Key
         type: string
         description: The user's name
         addons:

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ func TestOutputMetrics(t *testing.T) {
 	// t.Skip("Visual inspection only")
 
 	t.Run("empty", func(t *testing.T) {
+		defer fmt.Println()
 		m := &mockMetrics{
 			seen: map[string][]*gen.Measurement{
 				"todo": {
@@ -35,7 +37,7 @@ func TestOutputMetrics(t *testing.T) {
 						Path:     "pkg/todo/repository_logger.go",
 					},
 				},
-				"pkg/user": {
+				"user": {
 					{
 						FileName: "service.go",
 						Created:  false,
@@ -63,6 +65,7 @@ func TestOutputMetrics(t *testing.T) {
 	})
 
 	t.Run("populated", func(t *testing.T) {
+		defer fmt.Println()
 		m := &mockMetrics{
 			seen: map[string][]*gen.Measurement{
 				"todo": {

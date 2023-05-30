@@ -21,7 +21,7 @@ func TestWriteToErrorLog(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
-		if !fs.FileExists(tmpDir + logFileSuffix) {
+		if !fs.FileExists(tmpDir + logFile) {
 			t.Error("File was not created")
 		}
 	})
@@ -31,7 +31,7 @@ func TestWriteToErrorLog(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
-		fileBytes, err := os.ReadFile(tmpDir + logFileSuffix)
+		fileBytes, err := os.ReadFile(tmpDir + logFile)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}

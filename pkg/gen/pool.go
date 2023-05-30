@@ -35,6 +35,7 @@ func (p *pool) Acquire() {
 	defer p.mu.Unlock()
 
 	p.seats <- struct{}{}
+	p.wg.Add(1)
 }
 
 func (p *pool) Release() {
@@ -42,4 +43,5 @@ func (p *pool) Release() {
 	defer p.mu.Unlock()
 
 	<-p.seats
+	p.wg.Done()
 }

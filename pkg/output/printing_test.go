@@ -31,7 +31,7 @@ func TestOutput(t *testing.T) {
 	})
 
 	t.Run("info", func(t *testing.T) {
-		Info("this is information about something")
+		Info("this is information about something", "so is this")
 	})
 
 	t.Run("error", func(t *testing.T) {
