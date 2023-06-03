@@ -21,7 +21,7 @@ func Execute(loc string, logger slog.Logger) (md *core.Metadata, _ Metrics, err 
 	}
 
 	// Create the output directory if it doesn't exist.
-	outPath := spec.GetOutPath()
+	outPath := spec.GetPkgDomainOutPath()
 	if err = fs.CreateDirINE(outPath); err != nil {
 		return
 	}
@@ -32,7 +32,7 @@ func Execute(loc string, logger slog.Logger) (md *core.Metadata, _ Metrics, err 
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx = context.WithValue(ctx, stateInContextKey, &state{
 		paths: &paths{
-			CodegenPath: spec.Metadata.DomainDir,
+			CodegenPath: spec.Metadata.CodegenDir,
 			PkgOutPath:  outPath,
 		},
 		metrics: ms,

@@ -80,13 +80,64 @@ func test_setupTestDir(subDir string) (func(), error) {
 }
 
 const codegenCfg = `pkg:
-  output: pkg
-  extension: go
+  scopes:
+    # Go Example
+    - key: go-server-pkgs
+      output: core/pkg
+      jobs:
+        - key: models
+          file-name: models
+          template: presets.service
 
-  jobs:
-    - name: models 
-      file-name: models 
-      template: presets.service
+        - key: service
+          file-name: service
+          template: go/custom
+
+        - key: repository
+          file-name: repository_logger
+          template: go/custom
+
+    # Java Example
+    - key: java-server-models
+      output: java/main/src/models
+      jobs:
+        - key: models
+          file-name: \{pkg.asTitle\}.java
+          template: java/model
+
+    - key: java-server-services
+      output: java/main/src/services
+      jobs:
+        - key: service
+          file-name: \{pkg.asTitle.asCamel\}Service.java
+          template: java/service
+
+
+http:
+  scopes:
+    - key: server
+      output: cmd/api/http
+      jobs:
+        - key: controller
+          file-name: \{pkg.asLower.asSnake\}_controller
+          template: go/custom/controller
+
+    - key: flutter-client
+      output: apps/flutter/lib/api
+      jobs:
+        - key: api
+          file-name: api.dart
+          template: dart/api
+          concat: true
+
+    - key: nextjs-client
+      output: apps/nextjs/lib/api
+      jobs:
+        - key: controller
+          file-name: api.ts
+          template: dart/api
+          concat: true
+
 `
 
 const testPkgCfg = `name: user 

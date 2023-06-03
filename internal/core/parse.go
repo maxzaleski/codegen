@@ -1,12 +1,10 @@
 package core
 
 import (
-	"github.com/go-playground/validator/v10"
-	"os"
-	"path/filepath"
-
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
+	"os"
+	"path/filepath"
 )
 
 const (
@@ -14,7 +12,7 @@ const (
 	domainEntry = "config.yaml"
 )
 
-var validate = validator.New()
+var validate = newValidator()
 
 // NewSpec parses the .codegen directory and returns a `Spec`.
 func NewSpec(loc string) (spec *Spec, err error) {
@@ -33,7 +31,7 @@ func NewSpec(loc string) (spec *Spec, err error) {
 		err = errors.Wrapf(err, "failed to locate '%s' directory", DomainDir)
 		return
 	}
-	spec.Metadata.DomainDir = cfgDirPath
+	spec.Metadata.CodegenDir = cfgDirPath
 	spec.Metadata.Cwd = cwd
 
 	// Parse generator specification.

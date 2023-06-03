@@ -8,12 +8,13 @@ import (
 )
 
 var (
-	dirLikeRegex  = regexp.MustCompile("^[aA-zZ\\d/]+$")
-	propTypeRegex = regexp.MustCompile("^[aA-zZ\\d_-]+$")
+	dirLikeRegex       = regexp.MustCompile("^[aA-zZ\\d/]+$")
+	propTypeRegex      = regexp.MustCompile("^[aA-zZ\\d_-]+$")
+	parseFileNameRegex = regexp.MustCompile("\\\\{([aA-zZ]+\\.([aA-zZ]+\\.?)+)\\\\}")
 )
 
-// NewValidator returns a new instance of `validator.Validate`.
-func NewValidator() *validator.Validate {
+// newValidator returns a new instance of `validator.Validate`.
+func newValidator() *validator.Validate {
 	v := validator.New()
 
 	// Remaps `validator.FieldError.Field()` to return the "yaml" structure tag args.
@@ -52,5 +53,30 @@ func NewValidator() *validator.Validate {
 		return propTypeRegex.MatchString(fl.Field().String())
 	})
 
+	// Define a custom validation tag for file names. Moreover, parses the given format into the current struct.
+	_ = v.RegisterValidation("jobfilename", func(fl validator.FieldLevel) bool {
+		parent := fl.Parent()
+		jfn, ok := parent.Addr().Interface().(*ScopeJobFileName)
+		if !ok {
+			return false
+		}
+
+		matches := parseFileNameRegex.FindAllStringSubmatch(jfn.Value, -1)
+		for _, val := range Map(matches, func(s []string) string { return s[1] }) {
+			if !jfn.Assign(strings.Split(val, ".")) {
+				return false
+			}
+		}
+		return true
+	})
+
 	return v
+}
+
+func Map[T, U any](ts []T, f func(T) U) []U {
+	us := make([]U, len(ts))
+	for i := range ts {
+		us[i] = f(ts[i])
+	}
+	return us
 }

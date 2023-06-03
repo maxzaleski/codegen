@@ -1,6 +1,8 @@
 package core
 
-import "sort"
+import (
+	"sort"
+)
 
 // Spec represents the specification for the current generation.
 type Spec struct {
@@ -20,36 +22,143 @@ func newSpec() *Spec {
 	}
 }
 
-// GetOutPath returns the absolute path of the final output directory.
-func (s *Spec) GetOutPath() string {
-	return s.Metadata.Cwd + "/" + s.Config.Output
-}
-
 // Metadata represents the location metadata for the current generation.
 type Metadata struct {
 	// Location of the '.codegen' directory.
-	DomainDir string
+	CodegenDir string
 	// Location of the current working directory.
 	Cwd string
 }
 
 // Config represents the configuration for the current generation.
 type Config struct {
-	Lang   string           `yaml:"lang" validate:"lowercase,alpha,lt=5"`
-	Output string           `yaml:"output" validate:"required,dirlike"`
-	Jobs   []*GenerationJob `yaml:"jobs" validate:"dive"`
+	PkgDomain  *PkgDomain  `yaml:"pkg" validate:"dive"`
+	HttpDomain *HttpDomain `yaml:"http" validate:"dive"`
 }
 
-// GenerationJob represents a job to be performed for the current generation.
-//
-// Each package runs through the entire list of jobs. To opt out, specify the package name in the `exclude` field.
-type GenerationJob struct {
-	Key           string     `yaml:"name" validate:"required,alpha"`
-	Destination   string     `yaml:"destination" validate:"required,dirlike"`
-	Template      string     `yaml:"template" validate:"required"`
-	Lang          string     `yaml:"lang"  validate:"lowercase,alpha"`
-	DisableEmbeds bool       `yaml:"disable-embeds" validate:"boolean"`
-	Exclude       Exclusions `yaml:"exclude" validate:"omitempty,alpha"`
+type (
+	PkgDomain = Domain[*PkgDomainScope]
+
+	// PkgDomainScope represents a scope under the 'pkg' domain.
+	PkgDomainScope = DomainScope[PkgScopeJob]
+
+	// PkgScopeJob represents a job to be performed under the current 'Pkg' scope.
+	PkgScopeJob = *ScopeJob
+)
+
+type (
+	HttpDomain = Domain[*HttpScope]
+
+	// HttpScope represents a scope under the 'Http' domain.
+	HttpScope = DomainScope[HttpScopeJob]
+
+	// HttpScopeJob represents a job to be performed under the current 'Http' scope.
+	HttpScopeJob struct {
+		*ScopeJob `yaml:",inline"`
+		Concat    bool `yaml:"concat" validate:"boolean"`
+	}
+)
+
+type (
+	ScopeJobPresence interface {
+		Get() *ScopeJob
+	}
+
+	// ScopeJob represents a generic job to be performed under the current scope.
+	ScopeJob struct {
+		Key           string            `yaml:"key" validate:"required"`
+		FileName      *ScopeJobFileName `yaml:",inline" validate:"dive"`
+		Template      string            `yaml:"template" validate:"required"`
+		DisableEmbeds bool              `yaml:"disable-embeds" validate:"boolean"`
+		Excludes      Exclusions        `yaml:"exclude" validate:"omitempty,alpha"`
+	}
+
+	ScopeJobFileName struct {
+		Value string `yaml:"file-name" validate:"required,jobfilename"`
+
+		Token     string
+		Modifiers []CaseModifier
+	}
+)
+
+func (s *ScopeJob) Get() *ScopeJob {
+	return s
+}
+
+func (jfn *ScopeJobFileName) Assign(vals []string) bool {
+	if jfn.Modifiers == nil {
+		jfn.Modifiers = make([]CaseModifier, 0, len(vals)-1)
+	}
+
+	jfn.Token = vals[0]
+
+	for _, val := range vals[1:] {
+		isPrimary, isSecondary := PrimaryCaseModifier(val).IsValid(), SecondaryCaseModifier(val).IsValid()
+		if !isPrimary && !isSecondary {
+			return false
+		}
+		jfn.Modifiers = append(jfn.Modifiers, CaseModifier(val))
+	}
+
+	return true
+}
+
+type (
+	// Domain represents a generic top-level self-contained domain of operations.
+	Domain[S any] struct {
+		Scopes []S `yaml:"scopes" validate:"dive"`
+	}
+
+	// DomainScope represents a generic scope under a domain.
+	DomainScope[J ScopeJobPresence] struct {
+		Key    string `yaml:"key" validate:"required"`
+		Output string `yaml:"output" validate:"required,dirlike"`
+		Jobs   []J    `yaml:"jobs" validate:"dive"`
+	}
+)
+
+const (
+	CaseModifierNone  CaseModifier = ""
+	CaseModifierLower CaseModifier = "asLower"
+	CaseModifierUpper CaseModifier = "asUpper"
+	CaseModifierTitle CaseModifier = "asTitle"
+
+	CaseModifierSnake CaseModifier = "asSnake"
+	CaseModifierCamel CaseModifier = "asCamel"
+)
+
+type CaseModifier string
+
+func (m CaseModifier) IsValid() bool {
+	return PrimaryCaseModifier(m).IsValid() ||
+		SecondaryCaseModifier(m).IsValid()
+}
+
+type PrimaryCaseModifier CaseModifier
+
+func (m PrimaryCaseModifier) IsValid() bool {
+	switch CaseModifier(m) {
+	case CaseModifierNone,
+		CaseModifierLower,
+		CaseModifierUpper,
+		CaseModifierTitle:
+		return true
+	default:
+		return false
+	}
+}
+
+type SecondaryCaseModifier CaseModifier
+
+func (m SecondaryCaseModifier) IsValid() bool {
+	switch CaseModifier(m) {
+	case CaseModifierNone,
+		CaseModifierSnake,
+		CaseModifierCamel:
+		return true
+	default:
+		return false
+	}
 }
 
 type Exclusions []string
