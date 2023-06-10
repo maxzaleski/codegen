@@ -9,10 +9,10 @@ import (
 
 const logFile = "/codegen_error.log"
 
-// WriteToErrorLog appends the given error to a log file in the current working directory.
+// ErrorFile appends the given error to a log file in the current working directory.
 //
-// If the file does not exist, WriteToErrorLog will create it.
-func WriteToErrorLog(cwd string, err error) error {
+// If the file does not exist, ErrorFile will create it.
+func ErrorFile(cwd string, err error) error {
 	dest, stackTrace := cwd+logFile, fmt.Sprintf("%+v", err)
 
 	// Check if the file already exists. If so, append the bytes.

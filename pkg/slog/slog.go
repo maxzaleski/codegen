@@ -1,7 +1,9 @@
 package slog
 
 type (
-	Logger interface {
+	ILogger interface {
+		Log(msg string)
+		Logf(format string, a ...any)
 	}
 
 	logger struct {
@@ -10,7 +12,7 @@ type (
 )
 
 // New creates a new logger.
-func New(debugFlag bool) Logger {
+func New(debugFlag bool) ILogger {
 	return &logger{
 		debugFlag: debugFlag,
 	}

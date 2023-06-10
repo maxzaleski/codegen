@@ -15,7 +15,7 @@ const (
 var validate = newValidator()
 
 // NewSpec parses the .codegen directory and returns a `Spec`.
-func NewSpec(loc string) (spec *Spec, err error) {
+func NewSpec(src string) (spec *Spec, err error) {
 	spec = newSpec()
 
 	// Establish presence of configuration directory.
@@ -23,8 +23,8 @@ func NewSpec(loc string) (spec *Spec, err error) {
 	if err != nil {
 		return nil, err
 	}
-	if loc != "" {
-		cwd += "/" + loc
+	if src != "" {
+		cwd += "/" + src
 	}
 	cfgDirPath := cwd + "/" + DomainDir
 	if _, err = os.Stat(cfgDirPath); os.IsNotExist(err) {
@@ -56,7 +56,7 @@ func NewSpec(loc string) (spec *Spec, err error) {
 		if err := unmarshal(path, pkg, false); err != nil {
 			return err
 		}
-		// Order method arguments by `index` field.
+		// Primary method arguments by `index` field.
 		if len(pkg.Models) != 0 {
 			for _, m := range pkg.Models {
 				if len(m.Methods) != 0 {
@@ -97,7 +97,7 @@ func unmarshal(path string, dest interface{}, checkPresence bool) error {
 		}
 		return err
 	}
-	if err := yaml.Unmarshal(bs, dest); err != nil {
+	if err = yaml.Unmarshal(bs, dest); err != nil {
 		return errors.Wrapf(err, "failed to unmarshal file at '%s'", path)
 	}
 	return nil

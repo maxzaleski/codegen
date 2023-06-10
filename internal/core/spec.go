@@ -37,45 +37,44 @@ type Config struct {
 }
 
 type (
-	PkgDomain = Domain[*PkgDomainScope]
+	PkgDomain = Domain
 
 	// PkgDomainScope represents a scope under the 'pkg' domain.
-	PkgDomainScope = DomainScope[PkgScopeJob]
-
-	// PkgScopeJob represents a job to be performed under the current 'Pkg' scope.
-	PkgScopeJob = *ScopeJob
+	PkgDomainScope = DomainScope
 )
 
 type (
-	HttpDomain = Domain[*HttpScope]
+	HttpDomain = Domain
 
-	// HttpScope represents a scope under the 'Http' domain.
-	HttpScope = DomainScope[HttpScopeJob]
-
-	// HttpScopeJob represents a job to be performed under the current 'Http' scope.
-	HttpScopeJob struct {
-		*ScopeJob `yaml:",inline"`
-		Concat    bool `yaml:"concat" validate:"boolean"`
-	}
+	// HttpDomainScope represents a scope under the 'Http' domain.
+	HttpDomainScope = DomainScope
 )
 
 type (
-	ScopeJobPresence interface {
-		Get() *ScopeJob
-	}
-
 	// ScopeJob represents a generic job to be performed under the current scope.
 	ScopeJob struct {
-		Key           string            `yaml:"key" validate:"required"`
-		FileName      *ScopeJobFileName `yaml:",inline" validate:"dive"`
-		Template      string            `yaml:"template" validate:"required"`
-		DisableEmbeds bool              `yaml:"disable-embeds" validate:"boolean"`
-		Excludes      Exclusions        `yaml:"exclude" validate:"omitempty,alpha"`
+		Key              string              `yaml:"key" validate:"required"`
+		FileName         *ScopeJobFileName   `yaml:",inline" validate:"dive"`
+		Templates        []*ScopeJobTemplate `yaml:"templates" validate:"required,dive"`
+		DisableEmbeds    bool                `yaml:"disable-templates" validate:"boolean"`
+		Excludes         Exclusions          `yaml:"exclude" validate:"omitempty,alpha"`
+		Concat           bool                `yaml:"concat" validate:"boolean"`
+		FileAbsolutePath string              `yaml:"-"`
+	}
+
+	ScopeJobTemplate struct {
+		Primary bool   `yaml:"primary" validate:"boolean"`
+		Name    string `yaml:"name" validate:"required"`
 	}
 
 	ScopeJobFileName struct {
-		Value string `yaml:"file-name" validate:"required,jobfilename"`
+		Value     string `yaml:"file-name" validate:"required,jobfilename"`
+		Extension string `yaml:"-"`
+		Mods      []*FileNameMod
+	}
 
+	FileNameMod struct {
+		Key       int
 		Token     string
 		Modifiers []CaseModifier
 	}
@@ -85,35 +84,37 @@ func (s *ScopeJob) Get() *ScopeJob {
 	return s
 }
 
-func (jfn *ScopeJobFileName) Assign(vals []string) bool {
-	if jfn.Modifiers == nil {
-		jfn.Modifiers = make([]CaseModifier, 0, len(vals)-1)
+func (jfn *ScopeJobFileName) Assign(key int, vals []string) bool {
+	mod := &FileNameMod{
+		Key:       key,
+		Token:     vals[0],
+		Modifiers: make([]CaseModifier, 0, len(vals)-1),
 	}
-
-	jfn.Token = vals[0]
-
 	for _, val := range vals[1:] {
 		isPrimary, isSecondary := PrimaryCaseModifier(val).IsValid(), SecondaryCaseModifier(val).IsValid()
 		if !isPrimary && !isSecondary {
 			return false
 		}
-		jfn.Modifiers = append(jfn.Modifiers, CaseModifier(val))
+		mod.Modifiers = append(mod.Modifiers, CaseModifier(val))
 	}
+	jfn.Mods = append(jfn.Mods, mod)
 
 	return true
 }
 
 type (
 	// Domain represents a generic top-level self-contained domain of operations.
-	Domain[S any] struct {
-		Scopes []S `yaml:"scopes" validate:"dive"`
+	Domain struct {
+		Scopes []*DomainScope `yaml:"scopes" validate:"dive"`
 	}
 
 	// DomainScope represents a generic scope under a domain.
-	DomainScope[J ScopeJobPresence] struct {
-		Key    string `yaml:"key" validate:"required"`
-		Output string `yaml:"output" validate:"required,dirlike"`
-		Jobs   []J    `yaml:"jobs" validate:"dive"`
+	DomainScope struct {
+		Key            string      `yaml:"key" validate:"required"`
+		Output         string      `yaml:"output" validate:"required,dirlike"`
+		Inline         bool        `yaml:"inline" validate:"boolean"`
+		AbsoluteOutput string      `yaml:"-"`
+		Jobs           []*ScopeJob `yaml:"jobs" validate:"dive"`
 	}
 )
 
@@ -125,6 +126,7 @@ const (
 
 	CaseModifierSnake CaseModifier = "asSnake"
 	CaseModifierCamel CaseModifier = "asCamel"
+	CaseModifierKebab CaseModifier = "asKebab"
 )
 
 type CaseModifier string

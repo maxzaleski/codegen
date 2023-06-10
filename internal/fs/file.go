@@ -1,6 +1,7 @@
 package fs
 
 import (
+	"bytes"
 	"os"
 
 	"github.com/pkg/errors"
@@ -12,7 +13,7 @@ func CreateFile(dest string, b []byte) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to create file at '%s'", dest)
 	}
-	if _, err := f.Write(b); err != nil {
+	if _, err := f.Write(bytes.TrimSpace(b)); err != nil {
 		return errors.Wrapf(err, "failed to write to file at '%s'", dest)
 	}
 	return nil

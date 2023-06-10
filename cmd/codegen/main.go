@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/codegen/pkg/slog"
 	"os"
-	"sort"
 	"time"
 
 	"github.com/codegen/pkg/gen"
@@ -14,58 +13,27 @@ import (
 )
 
 var (
-	locFlag   = flag.String("c", "", "location of the .codegen folder")
-	debugFlag = flag.Bool("d", false, "enable debug mode")
+	locFlag     = flag.String("c", "", "location of the .codegen folder")
+	debugFlag   = flag.Bool("d", false, "enable debug mode")
+	workersFlag = flag.Int("w", 30, "specify worker count")
 )
 
 func main() {
-	// Creates space after the output.
-	defer fmt.Println()
+	defer fmt.Println() // Creates a final space after the output.
 
 	start := time.Now()
 	flag.Parse()
 
 	// Execute code generation.
-	md, m, err := gen.Execute(*locFlag, slog.New(*debugFlag))
+	md, m, err := gen.Execute(*locFlag, *workersFlag, slog.New(*debugFlag))
 	if err != nil {
 		output.Error(err)
-		if err := output.WriteToErrorLog(md.Cwd, err); err != nil {
+		if err := output.ErrorFile(md.Cwd, err); err != nil {
 			output.Error(errors.Wrap(err, "failed to create error log file"))
 		}
 		os.Exit(1)
 	}
 
-	// Output generation metrics to stdout.
-	outputMetrics(start, m)
-}
-
-func outputMetrics(began time.Time, m gen.Metrics) {
-	fmt.Println()
-
-	// Alphabetically sort the packages.
-	keys := m.Keys()
-	sort.Strings(keys)
-
-	// Print metrics per package.
-	totalGenerated := 0
-	for _, pkg := range keys {
-		output.Package(pkg)
-
-		for _, file := range m.Get(pkg) {
-			output.File(file.Path, file.Created)
-			if file.Created {
-				totalGenerated++
-			}
-		}
-		fmt.Println()
-	}
-
-	// Print final report.
-	output.Report(began, totalGenerated, len(keys))
-	if totalGenerated == 0 {
-		output.Info(
-			"If this is unexpected, verify that a new job is correctly defined in the config file.",
-			"For more information, please refer to the official documentation.",
-		)
-	}
+	// Output execution metrics.
+	output.Metrics(start, m)
 }

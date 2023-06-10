@@ -15,7 +15,7 @@ func TestNewSpec(t *testing.T) {
 	})
 
 	t.Run("valid configuration directory", func(t *testing.T) {
-		reset, err := test_setupTestDir("")
+		reset, err := setupTestDir("")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -28,7 +28,7 @@ func TestNewSpec(t *testing.T) {
 	t.Run("valid configuration directory with specified location", func(t *testing.T) {
 		specified := "subdir"
 
-		reset, err := test_setupTestDir(specified)
+		reset, err := setupTestDir(specified)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -39,7 +39,7 @@ func TestNewSpec(t *testing.T) {
 	})
 }
 
-func test_setupTestDir(subDir string) (func(), error) {
+func setupTestDir(subDir string) (func(), error) {
 	var wd string
 	if subDir != "" {
 		wd = subDir + "/"
@@ -87,7 +87,7 @@ const codegenCfg = `pkg:
       jobs:
         - key: models
           file-name: models
-          template: presets.service
+          template: embeds.service
 
         - key: service
           file-name: service
@@ -119,7 +119,7 @@ http:
       output: cmd/api/http
       jobs:
         - key: controller
-          file-name: \{pkg.asLower.asSnake\}_controller
+          file-name: \{pkg.asLower.asSnake\}_\{pkg.asUpper.asSnake\}controller
           template: go/custom/controller
 
     - key: flutter-client

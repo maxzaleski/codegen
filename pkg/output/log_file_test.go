@@ -17,7 +17,7 @@ func TestWriteToErrorLog(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	t.Run("file does not exists; create", func(t *testing.T) {
-		err = WriteToErrorLog(tmpDir, fmt.Errorf("error message 1"))
+		err = ErrorFile(tmpDir, fmt.Errorf("error message 1"))
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -27,7 +27,7 @@ func TestWriteToErrorLog(t *testing.T) {
 	})
 
 	t.Run("file exists; append", func(t *testing.T) {
-		err = WriteToErrorLog(tmpDir, fmt.Errorf("error message 2"))
+		err = ErrorFile(tmpDir, fmt.Errorf("error message 2"))
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -42,7 +42,7 @@ func TestWriteToErrorLog(t *testing.T) {
 	})
 
 	t.Run("error", func(t *testing.T) {
-		err = WriteToErrorLog("/non-existent", fmt.Errorf("error message 3"))
+		err = ErrorFile("/non-existent", fmt.Errorf("error message 3"))
 		if err == nil {
 			t.Error("Expected error, but none occurred")
 		}

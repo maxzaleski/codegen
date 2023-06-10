@@ -1,6 +1,8 @@
 package core
 
 import (
+	"fmt"
+	"github.com/codegen/internal/utils"
 	"github.com/go-playground/validator/v10"
 	"reflect"
 	"regexp"
@@ -61,22 +63,26 @@ func newValidator() *validator.Validate {
 			return false
 		}
 
-		matches := parseFileNameRegex.FindAllStringSubmatch(jfn.Value, -1)
-		for _, val := range Map(matches, func(s []string) string { return s[1] }) {
-			if !jfn.Assign(strings.Split(val, ".")) {
+		matches_ := parseFileNameRegex.FindAllStringSubmatch(jfn.Value, -1)
+		matches := utils.Map(matches_, func(s []string) string { return s[1] })
+
+		i := len(matches)
+		jfn.Value = parseFileNameRegex.ReplaceAllStringFunc(jfn.Value, func(s string) string {
+			defer func(i *int) { *i-- }(&i)
+			return fmt.Sprintf("{%d}", len(matches)-i)
+		})
+		for i, match := range matches {
+			if ok = jfn.Assign(i, strings.Split(match, ".")); !ok {
 				return false
 			}
 		}
+
+		// Extract the file extension.
+		cs := strings.Split(jfn.Value, ".")
+		jfn.Extension = cs[len(cs)-1]
+
 		return true
 	})
 
 	return v
-}
-
-func Map[T, U any](ts []T, f func(T) U) []U {
-	us := make([]U, len(ts))
-	for i := range ts {
-		us[i] = f(ts[i])
-	}
-	return us
 }
