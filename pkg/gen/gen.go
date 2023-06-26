@@ -13,8 +13,14 @@ import (
 
 var aggrScopes []*core.DomainScope
 
-func Execute(sl string, workers int, logger slog.ILogger) (md *core.Metadata, _ metrics.IMetrics, err error) {
-	spec, err := core.NewSpec(sl) // Parse configuration via `.codegen` directory.
+type Config struct {
+	Location         string
+	WorkerCount      int
+	DisableTemplates bool
+}
+
+func Execute(rc Config, logger slog.ILogger) (md *core.Metadata, _ metrics.IMetrics, err error) {
+	spec, err := core.NewSpec(rc.Location) // Parse configuration via `.codegen` directory.
 	md = spec.Metadata
 	if err != nil {
 		err = errors.Wrapf(err, "failed to produce a new specification")
@@ -28,7 +34,7 @@ func Execute(sl string, workers int, logger slog.ILogger) (md *core.Metadata, _ 
 	aggrScopes = append(aggrScopes, tScopes...)
 
 	wg, errChan := &sync.WaitGroup{}, make(chan error, 1)
-	q, ms := newPool(workers), metrics.New(nil)
+	q, ms := newPool(rc.WorkerCount), metrics.New(nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx = context.WithValue(ctx, "logger", logger)
@@ -50,11 +56,11 @@ func Execute(sl string, workers int, logger slog.ILogger) (md *core.Metadata, _ 
 
 	// Feed the queue with jobs.
 	wg.Add(1)
-	go feedQueue(ctx, wg, spec, q)
+	go feedQueue(ctx, wg, spec, q, rc.DisableTemplates)
 
 	// Start workers.
 	wg.Add(1)
-	go startWorkers(ctx, workers, wg, q, errChan)
+	go startWorkers(ctx, rc.WorkerCount, wg, q, errChan)
 
 	wg.Wait()
 	close(errChan) // Consequently, the err-listening goroutine will terminate.
@@ -74,15 +80,16 @@ func walkDirectoryStructure(_ context.Context, md *core.Metadata, wg *sync.WaitG
 	}
 }
 
-func feedQueue(_ context.Context, wg *sync.WaitGroup, spec *core.Spec, q IQueue) {
+func feedQueue(_ context.Context, wg *sync.WaitGroup, spec *core.Spec, q IQueue, disableTemplates bool) {
 	defer wg.Done()
 
 	for _, s := range aggrScopes {
 		for _, p := range spec.Pkgs {
 			for _, j := range s.Jobs {
 				q.Enqueue(&job{
-					ScopeJob: j,
-					Package:  p,
+					ScopeJob:         j,
+					Package:          p,
+					DisableTemplates: disableTemplates,
 					Metadata: Metadata{
 						Metadata:     *spec.Metadata,
 						ScopeKey:     s.Key,

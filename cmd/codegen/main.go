@@ -9,31 +9,37 @@ import (
 
 	"github.com/codegen/pkg/gen"
 	"github.com/codegen/pkg/output"
-	"github.com/pkg/errors"
 )
 
 var (
-	locFlag     = flag.String("c", "", "location of the .codegen folder")
-	debugFlag   = flag.Bool("d", false, "enable debug mode")
-	workersFlag = flag.Int("w", 30, "specify worker count")
+	locFlag      = flag.String("c", "", "specify location of the tool's folder. Default: `cwd`")
+	debugFlag    = flag.Bool("d", false, "enable debug mode")
+	workersFlag  = flag.Int("w", 30, "specify number of workers available in the runtime pool")
+	templateFlag = flag.Bool("ignoreTemplates", false, "ignore templates read from configuration")
 )
 
 func main() {
-	defer fmt.Println() // Creates a final space after the output.
+	defer fmt.Println()
 
 	start := time.Now()
 	flag.Parse()
 
 	// Execute code generation.
-	md, m, err := gen.Execute(*locFlag, *workersFlag, slog.New(*debugFlag))
-	if err != nil {
-		output.Error(err)
-		if err := output.ErrorFile(md.Cwd, err); err != nil {
-			output.Error(errors.Wrap(err, "failed to create error log file"))
-		}
-		os.Exit(1)
+	c := gen.Config{
+		Location:         *locFlag,
+		WorkerCount:      *workersFlag,
+		DisableTemplates: *templateFlag,
 	}
+	md, mts, err := gen.Execute(c, slog.New(*debugFlag))
 
-	// Output execution metrics.
-	output.Metrics(start, m)
+	// Instantiate output client.
+	o := output.New(*md, start)
+
+	// Handle outcome.
+	if err != nil {
+		o.PrintError(err)
+		os.Exit(1)
+	} else {
+		o.PrintFinalReport(mts)
+	}
 }

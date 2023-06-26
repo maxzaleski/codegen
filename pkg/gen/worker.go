@@ -20,7 +20,7 @@ func worker(ctx context.Context, wg *sync.WaitGroup, q IQueue, errChan chan<- er
 	l := ctx.Value("logger").(slog.ILogger)
 
 	for j := range q.Stream() {
-		mrt := &metrics.Measurement{ScopeKey: j.ScopeKey}
+		mrt := &metrics.Measurement{}
 
 		if err := generateFile(ctx, j); err != nil {
 			errChan <- err
@@ -31,7 +31,7 @@ func worker(ctx context.Context, wg *sync.WaitGroup, q IQueue, errChan chan<- er
 		}
 
 		mrt.FileAbsolutePath = j.FileAbsolutePath
-		m.Measure(j.Package.Name, mrt)
+		m.Measure(j.ScopeKey, j.Package.Name, mrt)
 	}
 }
 

@@ -19,18 +19,17 @@ type (
 func (tf templateFactory) ExecuteTemplate() error {
 	jts, ext := tf.j.Templates, tf.j.FileName.Extension
 
+	// [dev] Execute an empty template.
+	if tf.j.DisableTemplates {
+		tt, err := template.ParseFS(embeds.FS, "empty.tmpl")
+		if err != nil {
+			panic("binary corrupted")
+		}
+		return tf.write(tt)
+	}
+
 	// 1. Define primary and secondary templates.
 	ts, pt := make([]string, 1, len(jts)), ""
-	for _, t := range jts {
-		if t.Primary {
-			pt = t.Name
-		} else {
-			ts = append(ts, t.Name)
-		}
-	}
-	if pt == "" {
-		return errors.New("failed to specify provide a primary template")
-	}
 
 	// 2. Parse primary template; defines base for all future inclusions.
 	tt, err := template.ParseFiles(pt)

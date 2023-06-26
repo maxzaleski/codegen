@@ -7,11 +7,11 @@ import (
 )
 
 //go:embed templates/*.tmpl
-var fs embed.FS
+var FS embed.FS
 
 // Link injects the internal utility template for a given extension into the primary one.
 func Link(pt *template.Template, ext string) (t *template.Template, err error) {
-	t, err = pt.ParseFS(fs, ext+"_embeds.tmpl")
+	t, err = pt.ParseFS(FS, ext+"_embeds.tmpl")
 	if err != nil {
 		err = errors.Wrapf(err, "failed to parse embeds for ext='%s'", ext)
 	}

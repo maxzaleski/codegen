@@ -20,9 +20,10 @@ type (
 	job struct {
 		*core.ScopeJob
 
-		ScopeKey string
-		Metadata Metadata
-		Package  *core.Package
+		ScopeKey         string
+		Metadata         Metadata
+		Package          *core.Package
+		DisableTemplates bool
 	}
 
 	Metadata struct {
