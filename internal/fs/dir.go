@@ -8,7 +8,7 @@ import (
 
 // CreateDir creates a directory at the given path.
 func CreateDir(path string) error {
-	if err := os.Mkdir(path, 0777); err != nil {
+	if err := os.MkdirAll(path, 0777); err != nil {
 		return errors.Wrapf(err, "failed to create directory at '%s'", path)
 	}
 	return nil

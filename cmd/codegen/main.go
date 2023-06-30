@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/codegen/pkg/slog"
 	"os"
 	"time"
 
@@ -12,25 +11,29 @@ import (
 )
 
 var (
-	locFlag      = flag.String("c", "", "specify location of the tool's folder. Default: `cwd`")
+	locFlag      = flag.String("l", "", "specify location of the tool's folder. Default: `cwd`")
 	debugFlag    = flag.Bool("d", false, "enable debug mode")
 	workersFlag  = flag.Int("w", 30, "specify number of workers available in the runtime pool")
 	templateFlag = flag.Bool("ignoreTemplates", false, "ignore templates read from configuration")
 )
 
+func init() {
+	flag.Parse()
+}
+
 func main() {
 	defer fmt.Println()
 
 	start := time.Now()
-	flag.Parse()
 
 	// Execute code generation.
 	c := gen.Config{
 		Location:         *locFlag,
 		WorkerCount:      *workersFlag,
 		DisableTemplates: *templateFlag,
+		DebugMode:        *debugFlag,
 	}
-	md, mts, err := gen.Execute(c, slog.New(*debugFlag))
+	md, mts, err := gen.Execute(c, start)
 
 	// Instantiate output client.
 	o := output.New(*md, start)

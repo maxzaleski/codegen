@@ -23,37 +23,33 @@ func TestOutput(t *testing.T) {
 		},
 	}
 
-	//t.Run("scope", func(t *testing.T) {
-	//	.scope("Scope")
-	//})
-	//
-	//t.Run("package", func(t *testing.T) {
-	//	o.Package("Package", 0)
-	//})
-	//
-	//t.Run("package – final", func(t *testing.T) {
-	//	o.Package("Package", -1)
-	//})
-	//
-	//t.Run("file created", func(t *testing.T) {
-	//	o.File("foobar", true)
-	//})
-	//
-	//t.Run("file ignored", func(t *testing.T) {
-	//	o.File("foobar", false)
-	//})
+	t.Run("scope", func(t *testing.T) {
+		printScope("Name")
+	})
+
+	t.Run("package", func(t *testing.T) {
+		printPkg("Name")
+	})
+
+	t.Run("file created", func(t *testing.T) {
+		printFile("Name", true)
+	})
+
+	t.Run("file ignored", func(t *testing.T) {
+		printFile("Name", false)
+	})
 
 	t.Run("info", func(t *testing.T) {
-		o.Info("Line one", "Line two")
+		o.PrintInfo("Line one", "Line two")
 	})
 
 	t.Run("error", func(t *testing.T) {
-		o.Error(errors.WithStack(errors.New("this is an error")))
+		o.PrintError(errors.WithStack(errors.New("this is an error")))
 	})
 
 	t.Run("final reporting", func(t *testing.T) {
-		m := metrics.New(map[string]map[string][]*metrics.Measurement{
-			"go": {
+		m := metrics.New(map[string]interface{}{
+			"go": map[string][]*metrics.Measurement{
 				"pkg1": {
 					{
 						FileAbsolutePath: "path/to/file",
@@ -65,7 +61,7 @@ func TestOutput(t *testing.T) {
 					},
 				},
 			},
-			"java": {
+			"java": map[string][]*metrics.Measurement{
 				"pkg1": {
 					{
 						FileAbsolutePath: "path/to/file",
@@ -78,12 +74,12 @@ func TestOutput(t *testing.T) {
 				},
 			},
 		})
-		o.FinalReport(m)
+		o.PrintFinalReport(m)
 	})
 
 	t.Run("final reporting – no change", func(t *testing.T) {
-		m := metrics.New(map[string]map[string][]*metrics.Measurement{
-			"Scope1": {
+		m := metrics.New(map[string]interface{}{
+			"Scope1": map[string][]*metrics.Measurement{
 				"pkg1": {
 					{
 						FileAbsolutePath: "path/to/file",
@@ -98,6 +94,6 @@ func TestOutput(t *testing.T) {
 				},
 			},
 		})
-		o.FinalReport(m)
+		o.PrintFinalReport(m)
 	})
 }

@@ -53,13 +53,13 @@ type (
 type (
 	// ScopeJob represents a generic job to be performed under the current scope.
 	ScopeJob struct {
-		Key              string              `yaml:"key" validate:"required"`
-		FileName         *ScopeJobFileName   `yaml:",inline" validate:"dive"`
-		Templates        []*ScopeJobTemplate `yaml:"templates" validate:"required,dive"`
-		DisableEmbeds    bool                `yaml:"disable-templates" validate:"boolean"`
-		Excludes         Exclusions          `yaml:"exclude" validate:"omitempty,alpha"`
-		Concat           bool                `yaml:"concat" validate:"boolean"`
-		FileAbsolutePath string              `yaml:"-"`
+		Key              string             `yaml:"key" validate:"required"`
+		FileName         *ScopeJobFileName  `yaml:",inline" validate:"dive"`
+		Templates        []ScopeJobTemplate `yaml:"templates" validate:"required,dive"`
+		DisableEmbeds    bool               `yaml:"disable-templates" validate:"boolean"`
+		Excludes         Exclusions         `yaml:"exclude" validate:"omitempty,alpha"`
+		Unique           bool               `yaml:"unique" validate:"boolean"`
+		FileAbsolutePath string             `yaml:"-"`
 	}
 
 	ScopeJobTemplate struct {
@@ -80,9 +80,15 @@ type (
 	}
 )
 
-func (s *ScopeJob) Get() *ScopeJob {
-	return s
+// Copy deep copies the struct instance.
+func (s *ScopeJob) Copy() *ScopeJob {
+	sCopy, fnCopy := *s, *s.FileName
+	sCopy.FileName = &fnCopy
+	copy(sCopy.Templates, s.Templates)
+	return &sCopy
 }
+
+const modPkgReplacementToken = "pkg"
 
 func (jfn *ScopeJobFileName) Assign(key int, vals []string) bool {
 	mod := &FileNameMod{
@@ -116,6 +122,13 @@ type (
 		AbsoluteOutput string      `yaml:"-"`
 		Jobs           []*ScopeJob `yaml:"jobs" validate:"dive"`
 	}
+
+	DomainType string
+)
+
+const (
+	DomainTypeHttp DomainType = "domain_http"
+	DomainTypePkg  DomainType = "domain_pkg"
 )
 
 const (

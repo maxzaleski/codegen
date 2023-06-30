@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"github.com/codegen/internal/embeds"
 	"github.com/codegen/internal/fs"
-	"github.com/codegen/internal/utils"
+	"github.com/codegen/internal/utils/slice"
+	"github.com/codegen/pkg/gen/partials"
 	"github.com/pkg/errors"
 	"strings"
 	"text/template"
@@ -12,7 +13,7 @@ import (
 
 type (
 	templateFactory struct {
-		j *job
+		j *genJob
 	}
 )
 
@@ -21,7 +22,7 @@ func (tf templateFactory) ExecuteTemplate() error {
 
 	// [dev] Execute an empty template.
 	if tf.j.DisableTemplates {
-		tt, err := template.ParseFS(embeds.FS, "empty.tmpl")
+		tt, err := template.ParseFS(embeds.FS, "templates/empty.tmpl")
 		if err != nil {
 			panic("binary corrupted")
 		}
@@ -51,9 +52,11 @@ func (tf templateFactory) ExecuteTemplate() error {
 }
 
 func (tf templateFactory) write(tt *template.Template) error {
+	funcs := partials.GetByExtension(tf.j.FileName.Extension)
+
 	var buf bytes.Buffer
-	if err := tt.Execute(&buf, tf.j.Package); err != nil {
-		ts := strings.Join(utils.Map(tt.Templates(), func(t *template.Template) string { return t.Name() }), ", ")
+	if err := tt.Funcs(funcs).Execute(&buf, tf.j.Package); err != nil {
+		ts := strings.Join(slice.Map(tt.Templates(), func(t *template.Template) string { return t.Name() }), ", ")
 		return errors.Wrapf(err, "failed to execute templates '%s'", ts)
 	}
 	if err := fs.CreateFile(tf.j.FileAbsolutePath, buf.Bytes()); err != nil {

@@ -5,6 +5,8 @@ import (
 	"github.com/codegen/internal/fs"
 	"github.com/codegen/internal/metrics"
 	"github.com/codegen/internal/utils"
+	"github.com/codegen/internal/utils/slice"
+	"github.com/codegen/internal/utils/terminal"
 	"github.com/go-playground/validator/v10"
 	"os"
 	"sort"
@@ -49,15 +51,15 @@ func (c *client) PrintError(err error) {
 			// TODO: improve (verbosity of problem) validation messaging
 			msg = "\n"
 			msg += strings.Join(
-				utils.Map(valErrs, func(fe validator.FieldError) string { return "\t- " + fe.Error() }),
+				slice.Map(valErrs, func(fe validator.FieldError) string { return "\t- " + fe.Error() }),
 				"\n")
 		}
 	}
 	fmt.Printf("%s%s\n",
-		atom(red, eventPrefix("🫣"), "You've encountered an error:", msg),
+		terminal.Atom(terminal.Red, eventPrefix("🫣"), "You've encountered an error:", msg),
 		infoAtom("🐞",
 			fmt.Sprintf("Please check the error log file %s for the complete stracktrace.", c.getLogDest()),
-			fmt.Sprintf("If the issue persists, please do report it to me: %s 👈", atom(cyan, internal.GHIssuesURL)),
+			fmt.Sprintf("If the issue persists, please do report it to me: %s 👈", terminal.Atom(terminal.Cyan, internal.GHIssuesURL)),
 		))
 }
 
@@ -132,9 +134,9 @@ func (c *client) PrintFinalReport(m metrics.IMetrics) {
 	} else {
 		fmt.Printf("\n%s Generated %s across %s in %s.\n",
 			eventPrefix("🤓"),
-			atom(blue, fmt.Sprintf("%d files", totalFiles)),
-			atom(blue, fmt.Sprintf("%d packages", totalPkgs)),
-			atom(cyan, time.Since(c.began).String()),
+			terminal.Atom(terminal.Blue, fmt.Sprintf("%d files", totalFiles)),
+			terminal.Atom(terminal.Blue, fmt.Sprintf("%d packages", totalPkgs)),
+			terminal.Atom(terminal.Cyan, time.Since(c.began).String()),
 		)
 	}
 }
@@ -144,34 +146,30 @@ func (c *client) getLogDest() string {
 }
 
 func printScope(name string) {
-	fmt.Printf("\n🔬 %s\n", atom(bold+purple, name))
+	fmt.Printf("\n🔬 %s\n", terminal.Atom(terminal.Bold+terminal.Purple, name))
 }
 
 func printPkg(name string) {
-	fmt.Printf("%s\n%s 📦 %s\n", connectorTokenNeutral, connectorToken, atom(bold+cyan, name+"/"))
+	fmt.Printf("%s\n%s 📦 %s\n", connectorTokenNeutral, connectorToken, terminal.Atom(terminal.Bold+terminal.Cyan, name+"/"))
 }
 
 func printFile(name string, created bool) {
-	statusToken, statusColour := fileIgnoredToken, grey
+	statusToken, statusColour := fileIgnoredToken, terminal.Grey
 	fileColour := statusColour
 	if created {
-		statusToken, statusColour = fileCreatedToken, green
-		fileColour = white
+		statusToken, statusColour = fileCreatedToken, terminal.Green
+		fileColour = terminal.White
 	}
-	fmt.Printf("%s  %s  %s\n", connectorTokenNeutral, atom(statusColour, statusToken), atom(fileColour, name))
-}
-
-func infoAtom(emoji string, lines ...string) string {
-	return fmt.Sprintf("\n%s%s %s",
-		atom(grey, connectorTokenFile),
-		eventPrefix(emoji),
-		strings.Join(lines, "\n     "))
-}
-
-func atom(colour terminalColour, text ...string) string {
-	return fmt.Sprintf("%s%s%s", colour, strings.Join(text, " "), white)
+	fmt.Printf("%s  %s  %s\n", connectorTokenNeutral, terminal.Atom(statusColour, statusToken), terminal.Atom(fileColour, name))
 }
 
 func eventPrefix(emoji string) string {
 	return emoji + " " + eventToken
+}
+
+func infoAtom(emoji string, lines ...string) string {
+	return fmt.Sprintf("\n%s%s %s",
+		terminal.Atom(terminal.Grey, connectorTokenFile),
+		eventPrefix(emoji),
+		strings.Join(lines, "\n     "))
 }

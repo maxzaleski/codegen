@@ -6,14 +6,14 @@ type (
 	IMetrics interface {
 		// Keys returns the list of scopes for which metrics have been recorded.
 		Keys() []string
-		// Get returns the list of measurements for the specified scope.
-		Get(key string) map[string][]*Measurement
+		// Get returns the collection of measurements for the specified scope.
+		Get(scope string) map[string][]*Measurement
 	}
 
 	Metrics struct {
 		mu *sync.Mutex
 
-		seen map[string]map[string][]*Measurement
+		seen map[string]interface{}
 	}
 
 	Measurement struct {
@@ -24,9 +24,9 @@ type (
 
 var _ IMetrics = (*Metrics)(nil)
 
-func New(seen map[string]map[string][]*Measurement) *Metrics {
+func New(seen map[string]interface{}) *Metrics {
 	if seen == nil {
-		seen = make(map[string]map[string][]*Measurement)
+		seen = map[string]interface{}{}
 	}
 	return &Metrics{
 		mu:   &sync.Mutex{},
@@ -38,7 +38,13 @@ func (m *Metrics) Measure(scope, pkg string, mrt *Measurement) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.seen[scope][pkg] = append(m.seen[scope][pkg], mrt)
+	if m.seen[scope] == nil {
+		m.seen[scope] = map[string][]*Measurement{}
+	}
+	if m.seen[scope].(map[string][]*Measurement)[pkg] == nil {
+		m.seen[scope].(map[string][]*Measurement)[pkg] = make([]*Measurement, 0)
+	}
+	m.seen[scope].(map[string][]*Measurement)[pkg] = append(m.seen[scope].(map[string][]*Measurement)[pkg], mrt)
 }
 
 func (m *Metrics) Keys() []string {
@@ -56,5 +62,5 @@ func (m *Metrics) Get(key string) map[string][]*Measurement {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	return m.seen[key]
+	return m.seen[key].(map[string][]*Measurement)
 }

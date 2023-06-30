@@ -2,7 +2,7 @@ package core
 
 import (
 	"fmt"
-	"github.com/codegen/internal/utils"
+	"github.com/codegen/internal/utils/slice"
 	"github.com/go-playground/validator/v10"
 	"reflect"
 	"regexp"
@@ -64,7 +64,7 @@ func newValidator() *validator.Validate {
 		}
 
 		matches_ := parseFileNameRegex.FindAllStringSubmatch(jfn.Value, -1)
-		matches := utils.Map(matches_, func(s []string) string { return s[1] })
+		matches := slice.Map(matches_, func(s []string) string { return s[1] })
 
 		i := len(matches)
 		jfn.Value = parseFileNameRegex.ReplaceAllStringFunc(jfn.Value, func(s string) string {

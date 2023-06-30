@@ -4,58 +4,99 @@ import (
 	"context"
 	"fmt"
 	"github.com/codegen/internal/core"
+	"github.com/codegen/internal/core/slog"
 	"github.com/codegen/internal/metrics"
-	"github.com/codegen/pkg/slog"
 	"github.com/iancoleman/strcase"
 	"github.com/pkg/errors"
 	"os"
 	"strings"
 	"sync"
+	"time"
 )
 
-func worker(ctx context.Context, wg *sync.WaitGroup, q IQueue, errChan chan<- error) {
+func worker(ctx context.Context, id int, wg *sync.WaitGroup, q IQueue, errChan chan<- error) {
 	defer wg.Done()
 
 	m := ctx.Value("metrics").(*metrics.Metrics)
-	l := ctx.Value("logger").(slog.ILogger)
+	l := newLogger(
+		ctx.Value("logger").(slog.ILogger),
+		ctx.Value("began").(time.Time),
+		id,
+	)
 
-	for j := range q.Stream() {
-		mrt := &metrics.Measurement{}
+	l.Start()
+	defer l.Exit()
 
-		if err := generateFile(ctx, j); err != nil {
-			errChan <- err
-			q.Close()
-		} else {
-			mrt.Created = true
-			l.Logf("[%s] created successfully", j.FileName.Value)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			code := func() (code int) {
+				j, ok := q.Dequeue()
+				if !ok {
+					return -1
+				}
+
+				setFileAbsolutePath(j)
+				l.Ack(j)
+
+				mrt, sk := &metrics.Measurement{FileAbsolutePath: j.FileAbsolutePath}, j.Metadata.ScopeKey
+				if s := strings.Split(sk, "/"); len(s) == 2 {
+					sk = s[0]
+				}
+				defer func() {
+					tag := "[unique]"
+					if p := j.Package; p != nil {
+						tag = p.Name
+					}
+					m.Measure(sk, tag, mrt)
+				}()
+
+				if err := generateFile(l, j); err != nil {
+					if errors.Is(errFileAlreadyPresent, err) {
+						return
+					}
+
+					errChan <- err
+					return -1
+				}
+				defer l.EventFile("created", j)
+
+				mrt.Created = true
+				return
+			}()
+			if code != 0 {
+				return
+			}
 		}
-
-		mrt.FileAbsolutePath = j.FileAbsolutePath
-		m.Measure(j.ScopeKey, j.Package.Name, mrt)
 	}
 }
 
-func generateFile(ctx context.Context, j *job) error {
-	l := ctx.Value("logger").(slog.ILogger)
+var errFileAlreadyPresent = errors.New("file already exists")
 
-	fileAbsolutePath, fn := getFileAbsolutePath(j), j.FileName
-
-	if _, err := os.Stat(fileAbsolutePath); err != nil {
+func generateFile(wl ilogger, j *genJob) error {
+	if _, err := os.Stat(j.FileAbsolutePath); err != nil {
 		if !os.IsNotExist(err) {
-			return errors.WithMessagef(err, "failed presence check at '%s'", fileAbsolutePath)
+			return errors.WithMessagef(err, "failed presence check at '%s'", j.FileAbsolutePath)
 		}
-		l.Logf("[%s] already present -- skipped", fn.Value)
+	} else {
+		wl.EventFile("skipped", j)
+		return errFileAlreadyPresent
 	}
 
-	tf := templateFactory{j}
-	return tf.ExecuteTemplate()
+	return (templateFactory{j}).ExecuteTemplate()
 }
 
-func getFileAbsolutePath(j *job) (s string) {
+func setFileAbsolutePath(j *genJob) {
 	oc, pkg, fn := j.Metadata, j.Package, j.FileName
 
+	// Apply modifiers to file name.
 	for _, mod := range fn.Mods {
 		token, pm, sm := mod.Token, core.CaseModifierNone, core.CaseModifierNone
+		if token == "pkg" && pkg != nil {
+			token = pkg.Name
+		}
 		for _, m := range mod.Modifiers {
 			if core.PrimaryCaseModifier(m).IsValid() {
 				pm = m
@@ -67,13 +108,15 @@ func getFileAbsolutePath(j *job) (s string) {
 		fn.Value = strings.Replace(fn.Value, key, applyCaseModifiers(token, pm, sm), 1)
 	}
 
-	s = oc.AbsolutePath
-	if !oc.Inline {
-		s += fmt.Sprintf("/%s/%s", pkg.Name, fn.Value)
+	j.FileAbsolutePath = oc.AbsolutePath + "/"
+
+	// Inline: files are generated within the same directory space (e.g. models > User.Java, Car.Java).
+	// Unique: job is only to be performed once for the specified output.
+	if oc.Inline || j.Unique {
+		j.FileAbsolutePath += fn.Value
 	} else {
-		s += "/" + fn.Value
+		j.FileAbsolutePath += pkg.Name + "/" + fn.Value
 	}
-	return
 }
 
 func applyCaseModifiers(token string, pm core.CaseModifier, sm core.CaseModifier) (result string) {
