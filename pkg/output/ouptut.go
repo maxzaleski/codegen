@@ -99,15 +99,15 @@ func (c *client) writeLog(err1 error) {
 
 func (c *client) PrintFinalReport(m metrics.IMetrics) {
 	// Alphabetically sort the packages.
-	keys := m.Keys()
+	keys := m.ScopeKeys()
 	sort.Strings(keys)
 
 	// Print metrics per package.
 	totalFiles, totalPkgs := 0, 0
-	for _, scope := range m.Keys() {
+	for _, scope := range m.ScopeKeys() {
 		printScope(scope)
 
-		pkgs := m.Get(scope)
+		pkgs := m.GetPackageMeasurements(scope)
 		for pkg := range pkgs {
 			printPkg(pkg)
 

@@ -3,11 +3,13 @@ package metrics
 import "sync"
 
 type (
+	PackageMeasurements = map[string][]*Measurement
+
 	IMetrics interface {
-		// Keys returns the list of scopes for which metrics have been recorded.
-		Keys() []string
-		// Get returns the collection of measurements for the specified scope.
-		Get(scope string) map[string][]*Measurement
+		// ScopeKeys returns the list of scopes for which metrics have been recorded.
+		ScopeKeys() []string
+		// GetPackageMeasurements returns the collection of measurements for the specified scope.
+		GetPackageMeasurements(scope string) PackageMeasurements
 	}
 
 	Metrics struct {
@@ -38,16 +40,18 @@ func (m *Metrics) Measure(scope, pkg string, mrt *Measurement) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	// Verbose code to avoid panics.
+	// Go's laws of reflection: https://go.dev/blog/laws-of-reflection
 	if m.seen[scope] == nil {
-		m.seen[scope] = map[string][]*Measurement{}
+		m.seen[scope] = make(PackageMeasurements)
 	}
-	if m.seen[scope].(map[string][]*Measurement)[pkg] == nil {
-		m.seen[scope].(map[string][]*Measurement)[pkg] = make([]*Measurement, 0)
+	if m.seen[scope].(PackageMeasurements)[pkg] == nil {
+		m.seen[scope].(PackageMeasurements)[pkg] = make([]*Measurement, 0)
 	}
-	m.seen[scope].(map[string][]*Measurement)[pkg] = append(m.seen[scope].(map[string][]*Measurement)[pkg], mrt)
+	m.seen[scope].(PackageMeasurements)[pkg] = append(m.seen[scope].(PackageMeasurements)[pkg], mrt)
 }
 
-func (m *Metrics) Keys() []string {
+func (m *Metrics) ScopeKeys() []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -58,9 +62,9 @@ func (m *Metrics) Keys() []string {
 	return keys
 }
 
-func (m *Metrics) Get(key string) map[string][]*Measurement {
+func (m *Metrics) GetPackageMeasurements(key string) PackageMeasurements {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	return m.seen[key].(map[string][]*Measurement)
+	return m.seen[key].(PackageMeasurements)
 }

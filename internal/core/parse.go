@@ -102,7 +102,7 @@ func NewSpec(rl slog.ILogger, src string) (spec *Spec, err error) {
 
 // unmarshal wraps `yaml.Unmarshal`.
 //
-// `checkPresence` is used to determine whether to return an error if the file is not found.
+// Param: `checkPresence` determines whether to return an error if the file is not found.
 func unmarshal(path string, dest interface{}, checkPresence bool) error {
 	bs, err := os.ReadFile(path)
 	if err != nil {

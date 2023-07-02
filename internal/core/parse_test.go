@@ -2,15 +2,19 @@ package core
 
 import (
 	"fmt"
+	"github.com/codegen/internal/core/slog"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/go-playground/assert"
 )
 
 func TestNewSpec(t *testing.T) {
+	l := slog.New(false, time.Time{})
+
 	t.Run("no configuration directory", func(t *testing.T) {
-		_, err := NewSpec("")
+		_, err := NewSpec(l, "")
 		assert.NotEqual(t, err, nil)
 	})
 
@@ -21,7 +25,7 @@ func TestNewSpec(t *testing.T) {
 		}
 		defer reset()
 
-		_, err = NewSpec("")
+		_, err = NewSpec(l, "")
 		assert.Equal(t, err, nil)
 	})
 
@@ -34,7 +38,7 @@ func TestNewSpec(t *testing.T) {
 		}
 		defer reset()
 
-		_, err = NewSpec(specified)
+		_, err = NewSpec(l, specified)
 		assert.Equal(t, err, nil)
 	})
 }
@@ -175,8 +179,8 @@ interface:
       params:
         - name: u
           type: User
-    - name: Get
-      description: Get retrieves an existing user.
+    - name: GetPackageMeasurements
+      description: GetPackageMeasurements retrieves an existing user.
       params:
         - name: uID
           type: string 

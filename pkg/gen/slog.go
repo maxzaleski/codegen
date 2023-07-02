@@ -4,14 +4,7 @@ import (
 	"github.com/codegen/internal/core/slog"
 )
 
-const (
-	fileOutcomeSuccess fileOutcome = "created"
-	fileOutcomeIgnored fileOutcome = "ignored"
-)
-
 type (
-	fileOutcome string
-
 	// ILogger is the logger interface for the `gen` package.
 	ILogger interface {
 		slog.INamedLogger

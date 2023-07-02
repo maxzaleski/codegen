@@ -27,3 +27,8 @@ const (
 func Atom(colour Colour, text ...string) string {
 	return fmt.Sprintf("%s%s%s", colour, strings.Join(text, " "), white)
 }
+
+// domain returns a string in the format of `[domain:value]`.
+func domain(tc Colour, domain, value string) string {
+	return fmt.Sprintf("[%s:%s]", domain, Atom(tc, value))
+}

@@ -9,9 +9,9 @@ import (
 type (
 	ILogger interface {
 		// Log wraps `fmt.Println`.
-		Log(lines ...interface{})
+		Log(lines ...any)
 		// Logf wraps `fmt.Println` with the given format.
-		Logf(format string, a ...interface{})
+		Logf(format string, a ...any)
 	}
 
 	logger struct {
@@ -35,18 +35,19 @@ func New(debugFlag bool, began time.Time) ILogger {
 	}
 	if debugFlag {
 		l.Log(
-			Atom(Red, "Debug flag is set (--debug=1); Debug mode enabled, printing subsequent logs"))
+			Atom(Red, "Debug flag is set (--debug=1); debug mode enabled, printing subsequent logs.\n"),
+			Atom(Pink, "\n\tBe advised, this logger is called across goroutines, and as such logs may be in non-sequential order.\n"))
 	}
 	return l
 }
 
-func (l *logger) Log(lines ...interface{}) {
+func (l *logger) Log(lines ...any) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
 	if l.debugFlag {
 		linesCopy := make([]interface{}, 1, len(lines)+1)
-		linesCopy[0] = Domain(Yellow, "start", "+"+time.Since(l.began).String())
+		linesCopy[0] = domain(Yellow, "start", "+"+time.Since(l.began).String())
 		linesCopy = append(linesCopy, lines...)
 		fmt.Println(linesCopy...)
 	}
@@ -60,14 +61,4 @@ func (l *logger) Logf(format string, a ...any) {
 		s := fmt.Sprintf(format, a...)
 		fmt.Println(s)
 	}
-}
-
-// Domain returns a string in the format of `[domain:value]`.
-func Domain(tc Colour, domain, value string) string {
-	return fmt.Sprintf("[%s:%s]", domain, Atom(tc, value))
-}
-
-// OriginDomain wraps `Domain` with the domain set to `origin`.
-func OriginDomain(value string) string {
-	return Domain(Purple, "origin", value)
 }

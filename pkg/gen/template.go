@@ -2,6 +2,7 @@ package gen
 
 import (
 	"bytes"
+	"github.com/codegen/internal/core"
 	"github.com/codegen/internal/embeds"
 	"github.com/codegen/internal/fs"
 	"github.com/codegen/internal/utils/slice"
@@ -13,7 +14,8 @@ import (
 
 type (
 	templateFactory struct {
-		j *genJob
+		j    *genJob
+		pkgs []*core.Package
 	}
 )
 
@@ -54,8 +56,16 @@ func (tf templateFactory) ExecuteTemplate() error {
 func (tf templateFactory) write(tt *template.Template) error {
 	funcs := partials.GetByExtension(tf.j.FileName.Extension)
 
-	var buf bytes.Buffer
-	if err := tt.Funcs(funcs).Execute(&buf, tf.j.Package); err != nil {
+	var (
+		buf  bytes.Buffer
+		data any
+	)
+	data = tf.pkgs
+	if tf.j.Package != nil {
+		data = tf.j.Package
+	}
+
+	if err := tt.Funcs(funcs).Execute(&buf, data); err != nil {
 		ts := strings.Join(slice.Map(tt.Templates(), func(t *template.Template) string { return t.Name() }), ", ")
 		return errors.Wrapf(err, "failed to execute templates '%s'", ts)
 	}

@@ -16,11 +16,13 @@ import (
 func worker(ctx context.Context, id int, wg *sync.WaitGroup, q IQueue, errChan chan<- error) {
 	defer wg.Done()
 
-	m := ctx.Value("metrics").(*metrics.Metrics)
-	l := newLogger(
-		ctx.Value("logger").(slog.ILogger),
-		fmt.Sprintf("worker_%d", id),
-	)
+	pkgs, m, l :=
+		ctx.Value("packages").([]*core.Package),
+		ctx.Value("metrics").(*metrics.Metrics),
+		newLogger(
+			ctx.Value("logger").(slog.ILogger),
+			fmt.Sprintf("worker_%d", id),
+		)
 
 	l.Log("start", "msg", "starting worker")
 	defer l.Log("exit", "msg", "worker exiting")
@@ -51,7 +53,7 @@ func worker(ctx context.Context, id int, wg *sync.WaitGroup, q IQueue, errChan c
 					m.Measure(sk, tag, mrt)
 				}()
 
-				if err := generateFile(l, j); err != nil {
+				if err := generateFile(pkgs, l, j); err != nil {
 					if errors.Is(errFileAlreadyPresent, err) {
 						return
 					}
@@ -73,7 +75,7 @@ func worker(ctx context.Context, id int, wg *sync.WaitGroup, q IQueue, errChan c
 
 var errFileAlreadyPresent = errors.New("file already exists")
 
-func generateFile(l ILogger, j *genJob) error {
+func generateFile(pkgs []*core.Package, l ILogger, j *genJob) error {
 	if _, err := os.Stat(j.FileAbsolutePath); err != nil {
 		if !os.IsNotExist(err) {
 			return errors.WithMessagef(err, "failed presence check at '%s'", j.FileAbsolutePath)
@@ -83,7 +85,7 @@ func generateFile(l ILogger, j *genJob) error {
 		return errFileAlreadyPresent
 	}
 
-	return (templateFactory{j}).ExecuteTemplate()
+	return (templateFactory{j, pkgs}).ExecuteTemplate()
 }
 
 func setFileAbsolutePath(j *genJob) {

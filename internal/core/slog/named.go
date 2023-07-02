@@ -55,8 +55,8 @@ func (l *namedLogger) Log(event string, fields ...interface{}) {
 	}
 
 	l.logger.Log(
-		Domain(Purple, "origin", l.namespace),
-		Domain(Blue, "event", event),
+		domain(Purple, "origin", l.namespace),
+		domain(Blue, "event", event),
 		fieldsS,
 	)
 }

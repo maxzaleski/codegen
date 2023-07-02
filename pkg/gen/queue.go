@@ -10,12 +10,20 @@ import (
 
 type (
 	IQueue interface {
+		// Enqueue enqueues a job.
 		Enqueue(j *genJob)
+		// Dequeue blocks until a job is available. Returns nil if the queue is closed.
 		Dequeue(id int) (*genJob, bool)
-		Size() int
+
+		// GetSize returns the number of jobs in the queue.
+		GetSize() int
+		// GetCapacity returns the capacity of the queue .
+		GetCapacity() int
+
+		// Close closes the queue. This is a one-time operation and is safe to call multiple times.
 		Close()
-		// WaitReadiness blocks until the queue is ready.
-		WaitReadiness()
+		// ReadyListener returns a channel that is closed when the queue is ready.
+		ReadyListener() <-chan any
 		// Ready marks the queue as ready. This is a one-time operation and is safe to call multiple times.
 		Ready()
 	}
@@ -28,8 +36,9 @@ type (
 		closeOnce sync.Once
 
 		collection chan *genJob
-		readyChan  chan bool
+		readyChan  chan any
 		isClosed   bool
+		capacity   int
 	}
 
 	genJob struct {
@@ -69,7 +78,8 @@ func newQueue(l slog.ILogger, c Config) IQueue {
 		readyOnce: sync.Once{},
 
 		collection: make(chan *genJob, capacity),
-		readyChan:  make(chan bool, 1),
+		readyChan:  make(chan any, 0),
+		capacity:   capacity,
 	}
 }
 
@@ -79,14 +89,11 @@ func (q *queue) Enqueue(j *genJob) {
 	}
 	defer q.l.Ack("enqueue<-", j)
 
-	q.collection <- j
+	q.collection <- j // channels are thread-safe by default.
 }
 
 func (q *queue) Dequeue(wid int) (*genJob, bool) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
-	j := <-q.collection
+	j := <-q.collection // channels are thread-safe by default.
 	if j == nil {
 		if q.isClosed {
 			return nil, false
@@ -98,20 +105,24 @@ func (q *queue) Dequeue(wid int) (*genJob, bool) {
 	return j, true
 }
 
-func (q *queue) Size() int {
+func (q *queue) GetSize() int {
 	return len(q.collection)
+}
+
+func (q *queue) GetCapacity() int {
+	return q.capacity
 }
 
 func (q *queue) Ready() {
 	q.readyOnce.Do(func() {
-		defer q.l.Log("ready", "msg", "queue is ready", "size", q.Size())
+		defer q.logState("ready", "queue is ready")
 
-		q.readyChan <- true
+		close(q.readyChan)
 	})
 }
 
-func (q *queue) WaitReadiness() {
-	<-q.readyChan
+func (q *queue) ReadyListener() <-chan any {
+	return q.readyChan
 }
 
 func (q *queue) Close() {
@@ -119,9 +130,13 @@ func (q *queue) Close() {
 	defer q.mu.Unlock()
 
 	q.closeOnce.Do(func() {
-		defer q.l.Log("close", "msg", "queue is closed", "remaining", q.Size())
+		defer q.logState("close", "queue is closed")
 
 		close(q.collection)
 		q.isClosed = true
 	})
+}
+
+func (q *queue) logState(state string, msg string) {
+	q.l.Log(state, "msg", msg, "remaining", q.GetSize())
 }
