@@ -11,13 +11,23 @@ import (
 const (
 	DomainDir   = ".codegen"
 	domainEntry = "config.yaml"
+
+	event = "parsing"
 )
 
 var validate = newValidator()
 
 // NewSpec parses the .codegen directory and returns a `Spec`.
-func NewSpec(l slog.ILogger, src string) (spec *Spec, err error) {
-	spec = newSpec()
+func NewSpec(rl slog.ILogger, src string) (spec *Spec, err error) {
+	spec = newSpec() // Always returned.
+
+	l := slog.NewNamed(rl, "core")
+	l.Log(event, "msg", "parsing configuration")
+	defer func() {
+		if err == nil {
+			l.Log(event, "msg", "parsing complete", "packages", len(spec.Pkgs))
+		}
+	}()
 
 	// Establish presence of configuration directory.
 	cwd, err := os.Getwd()
@@ -28,7 +38,8 @@ func NewSpec(l slog.ILogger, src string) (spec *Spec, err error) {
 		cwd += "/" + src
 	}
 	cdp := cwd + "/" + DomainDir
-	l.Log(slog.OriginDomain("parse"), "dir", cdp)
+
+	l.Log(event, "msg", "locating "+DomainDir, "location", cdp)
 
 	if _, err = os.Stat(cdp); os.IsNotExist(err) {
 		err = errors.Wrapf(err, "failed to locate '%s' directory", DomainDir)
@@ -38,7 +49,9 @@ func NewSpec(l slog.ILogger, src string) (spec *Spec, err error) {
 	spec.Metadata.Cwd = cwd
 
 	// Parse generator specification.
-	if err = unmarshal(cdp+"/config.yaml", spec.Config, true); err != nil {
+	path := cdp + "/config.yaml"
+	l.Log(event, "msg", "parsing primary configuration", "path", path)
+	if err = unmarshal(path, spec.Config, true); err != nil {
 		return
 	}
 
@@ -55,8 +68,10 @@ func NewSpec(l slog.ILogger, src string) (spec *Spec, err error) {
 			return nil
 		}
 
+		l.Log(event, "msg", "parsing package", "path", path)
+
 		pkg := &Package{}
-		if err := unmarshal(path, pkg, false); err != nil {
+		if err = unmarshal(path, pkg, false); err != nil {
 			return err
 		}
 		// Primary method arguments by `index` field.
@@ -81,11 +96,7 @@ func NewSpec(l slog.ILogger, src string) (spec *Spec, err error) {
 		return
 	}
 
-	// Validate the resulting struct.
-	if err = validate.Struct(spec.Config); err != nil {
-		return
-	}
-
+	err = validate.Struct(spec.Config) // Validate the resulting struct.
 	return
 }
 

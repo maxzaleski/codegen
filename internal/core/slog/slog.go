@@ -11,7 +11,7 @@ type (
 		// Log wraps `fmt.Println`.
 		Log(lines ...interface{})
 		// Logf wraps `fmt.Println` with the given format.
-		Logf(format string, a ...any)
+		Logf(format string, a ...interface{})
 	}
 
 	logger struct {

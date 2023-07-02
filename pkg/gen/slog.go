@@ -1,9 +1,7 @@
 package gen
 
 import (
-	"fmt"
 	"github.com/codegen/internal/core/slog"
-	"strings"
 )
 
 const (
@@ -14,51 +12,22 @@ const (
 type (
 	fileOutcome string
 
+	// ILogger is the logger interface for the `gen` package.
 	ILogger interface {
-		Log(event string, fields ...any)
+		slog.INamedLogger
+
+		// Ack logs an acknowledgement event.
 		Ack(event string, j *genJob, fields ...any)
 	}
 
 	logger struct {
-		instance  slog.ILogger
-		namespace string
-		scopeKey  string
+		slog.INamedLogger
 	}
 )
 
-// New creates a new logger.
-func newLogger(parent slog.ILogger, ns string) ILogger {
-	return &logger{
-		instance:  parent,
-		namespace: ns,
-	}
-}
-
-func (l *logger) Log(event string, fields ...any) {
-	if event == "" {
-		panic("logger: event cannot be empty")
-	}
-
-	fieldsS := ""
-	if fields != nil {
-		for i := 0; i < len(fields); i += 2 {
-			f, val := fields[i], fields[i+1]
-			if _, ok := f.(string); !ok {
-				panic("logger: field key must be a string")
-			}
-			fs := f.(string)
-			if s, ok := val.(string); ok && !strings.Contains(fs, "file") {
-				val = fmt.Sprintf("'%s'", s)
-			}
-			fieldsS += fs + "=" + slog.Atom(slog.Cyan, fmt.Sprintf("%v ", val))
-		}
-	}
-
-	l.instance.Log(
-		slog.Domain(slog.Purple, "origin", l.namespace),
-		slog.Domain(slog.Blue, "event", event),
-		fieldsS,
-	)
+// New creates a new logger specific to the `gen` package.
+func newLogger(p slog.ILogger, ns string) ILogger {
+	return &logger{slog.NewNamed(p, ns)}
 }
 
 func (l *logger) Ack(event string, j *genJob, fields ...any) {
