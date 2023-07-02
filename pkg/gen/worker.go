@@ -11,7 +11,6 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"time"
 )
 
 func worker(ctx context.Context, id int, wg *sync.WaitGroup, q IQueue, errChan chan<- error) {
@@ -20,12 +19,11 @@ func worker(ctx context.Context, id int, wg *sync.WaitGroup, q IQueue, errChan c
 	m := ctx.Value("metrics").(*metrics.Metrics)
 	l := newLogger(
 		ctx.Value("logger").(slog.ILogger),
-		ctx.Value("began").(time.Time),
-		id,
+		fmt.Sprintf("worker_%d", id),
 	)
 
-	l.Start()
-	defer l.Exit()
+	l.Log("start", "msg", "starting worker")
+	defer l.Log("exit", "msg", "worker exiting")
 
 	for {
 		select {
@@ -33,13 +31,13 @@ func worker(ctx context.Context, id int, wg *sync.WaitGroup, q IQueue, errChan c
 			return
 		default:
 			code := func() (code int) {
-				j, ok := q.Dequeue()
+				j, ok := q.Dequeue(id)
 				if !ok {
 					return -1
 				}
 
 				setFileAbsolutePath(j)
-				l.Ack(j)
+				l.Ack("ack<-", j)
 
 				mrt, sk := &metrics.Measurement{FileAbsolutePath: j.FileAbsolutePath}, j.Metadata.ScopeKey
 				if s := strings.Split(sk, "/"); len(s) == 2 {
@@ -61,7 +59,7 @@ func worker(ctx context.Context, id int, wg *sync.WaitGroup, q IQueue, errChan c
 					errChan <- err
 					return -1
 				}
-				defer l.EventFile("created", j)
+				defer logFileOutcome(l, fileOutcomeSuccess, j)
 
 				mrt.Created = true
 				return
@@ -75,13 +73,13 @@ func worker(ctx context.Context, id int, wg *sync.WaitGroup, q IQueue, errChan c
 
 var errFileAlreadyPresent = errors.New("file already exists")
 
-func generateFile(wl ilogger, j *genJob) error {
+func generateFile(l ILogger, j *genJob) error {
 	if _, err := os.Stat(j.FileAbsolutePath); err != nil {
 		if !os.IsNotExist(err) {
 			return errors.WithMessagef(err, "failed presence check at '%s'", j.FileAbsolutePath)
 		}
 	} else {
-		wl.EventFile("skipped", j)
+		defer logFileOutcome(l, fileOutcomeIgnored, j)
 		return errFileAlreadyPresent
 	}
 

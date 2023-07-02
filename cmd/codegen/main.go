@@ -11,9 +11,9 @@ import (
 )
 
 var (
-	locFlag      = flag.String("l", "", "specify location of the tool's folder. Default: `cwd`")
-	debugFlag    = flag.Bool("d", false, "enable debug mode")
-	workersFlag  = flag.Int("w", 30, "specify number of workers available in the runtime pool")
+	locFlag      = flag.String("location", "", "specify location of the tool's folder. Default: `cwd`")
+	debugFlag    = flag.Bool("debug", false, "enable debug mode")
+	workersFlag  = flag.Int("workers", 30, "specify number of workers available in the runtime pool")
 	templateFlag = flag.Bool("ignoreTemplates", false, "ignore templates read from configuration")
 )
 

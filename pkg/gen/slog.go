@@ -3,69 +3,68 @@ package gen
 import (
 	"fmt"
 	"github.com/codegen/internal/core/slog"
-	"github.com/codegen/internal/utils/slice"
-	"github.com/codegen/internal/utils/terminal"
-	"time"
+	"strings"
+)
+
+const (
+	fileOutcomeSuccess fileOutcome = "created"
+	fileOutcomeIgnored fileOutcome = "ignored"
 )
 
 type (
-	ilogger interface {
-		EventFile(outcome string, j *genJob)
-		Start()
-		Exit()
-		Ack(j *genJob)
+	fileOutcome string
+
+	ILogger interface {
+		Log(event string, fields ...any)
+		Ack(event string, j *genJob, fields ...any)
 	}
 
 	logger struct {
-		began    time.Time
-		parent   slog.ILogger
-		workerId int
-		scopeKey string
+		instance  slog.ILogger
+		namespace string
+		scopeKey  string
 	}
 )
 
 // New creates a new logger.
-func newLogger(parent slog.ILogger, t time.Time, workerId int) ilogger {
+func newLogger(parent slog.ILogger, ns string) ILogger {
 	return &logger{
-		parent:   parent,
-		workerId: workerId,
-		began:    t,
+		instance:  parent,
+		namespace: ns,
 	}
 }
 
-func (l *logger) log(event string, lines ...interface{}) {
-	eventColour := terminal.Blue
-	if event == "ack" {
-		eventColour = terminal.Yellow
+func (l *logger) Log(event string, fields ...any) {
+	if event == "" {
+		panic("logger: event cannot be empty")
 	}
 
-	linesCopy := make([]interface{}, 1, len(lines)+1)
-	linesCopy[0] = fmt.Sprintf("[start:%s] %s [event:%s]",
-		terminal.Atom(terminal.Yellow, "+"+time.Since(l.began).String()),
-		terminal.Atom(terminal.Purple, fmt.Sprintf("[worker_%d]", l.workerId)),
-		terminal.Atom(eventColour, event),
+	fieldsS := ""
+	if fields != nil {
+		for i := 0; i < len(fields); i += 2 {
+			f, val := fields[i], fields[i+1]
+			if _, ok := f.(string); !ok {
+				panic("logger: field key must be a string")
+			}
+			fs := f.(string)
+			if s, ok := val.(string); ok && !strings.Contains(fs, "file") {
+				val = fmt.Sprintf("'%s'", s)
+			}
+			fieldsS += fs + "=" + slog.Atom(slog.Cyan, fmt.Sprintf("%v ", val))
+		}
+	}
+
+	l.instance.Log(
+		slog.Domain(slog.Purple, "origin", l.namespace),
+		slog.Domain(slog.Blue, "event", event),
+		fieldsS,
 	)
-	linesCopy = append(linesCopy, lines...)
-	l.parent.Log(linesCopy...)
 }
 
-func (l *logger) EventFile(outcome string, j *genJob) {
-	tokens := slice.Map([]string{j.Metadata.ScopeKey, j.Key, j.FileAbsolutePath, outcome}, func(t string) any {
-		return terminal.Atom(terminal.Cyan, t)
-	})
-	s := fmt.Sprintf("scopeKey=%s jobKey=%s file=%s status=%s", tokens...)
-	l.log("file", s)
-}
-
-func (l *logger) Start() {
-	l.log("system", "started")
-}
-
-func (l *logger) Exit() {
-	l.log("system", "exited")
-}
-
-func (l *logger) Ack(j *genJob) {
-	s := fmt.Sprintf("scopeKey=%s jobKey=%s unique=%v file=%s", j.Metadata.ScopeKey, j.Key, j.Unique, j.FileAbsolutePath)
-	l.log("ack", s)
+func (l *logger) Ack(event string, j *genJob, fields ...any) {
+	fieldsCopy := make([]any, 4, 4+len(fields))
+	fieldsCopy[0], fieldsCopy[1] = "scope", j.Metadata.ScopeKey
+	fieldsCopy[2], fieldsCopy[3] = "job", j.Key
+	fieldsCopy = append(fieldsCopy, fields...)
+	l.Log(event, fieldsCopy...)
 }

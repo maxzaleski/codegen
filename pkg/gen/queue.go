@@ -1,14 +1,17 @@
 package gen
 
 import (
+	"fmt"
 	"github.com/codegen/internal/core"
+	"github.com/codegen/internal/core/slog"
+	"math"
 	"sync"
 )
 
 type (
 	IQueue interface {
 		Enqueue(j *genJob)
-		Dequeue() (*genJob, bool)
+		Dequeue(id int) (*genJob, bool)
 		Size() int
 		Close()
 		// WaitReadiness blocks until the queue is ready.
@@ -18,13 +21,15 @@ type (
 	}
 
 	queue struct {
-		mu *sync.Mutex
+		l ILogger
 
-		_q          chan *genJob
-		_qOnce      sync.Once
-		_qClosed    bool
-		_qReady     chan bool
-		_qReadyOnce sync.Once
+		mu        *sync.Mutex
+		readyOnce sync.Once
+		closeOnce sync.Once
+
+		collection chan *genJob
+		readyChan  chan bool
+		isClosed   bool
 	}
 
 	genJob struct {
@@ -47,61 +52,76 @@ type (
 
 var _ IQueue = (*queue)(nil)
 
-func newPool(capacity int) IQueue {
-	mu := &sync.Mutex{}
-	return &queue{
-		mu: mu,
+// newQueue creates a new queue.
+//
+// The queue's capacity is set to `ceil(workerCount * 1.5)`.
+func newQueue(l slog.ILogger, c Config) IQueue {
+	capacity := int(math.Ceil(float64(c.WorkerCount) * 1.5))
+	if c.DebugMode && c.WorkerCount < 10 { // Omit; prevents deadlock in debug mode.
+		capacity = 10
+	}
 
-		//_q:          make(chan *genJob, capacity),
-		_q:          make(chan *genJob, 10),
-		_qOnce:      sync.Once{},
-		_qReady:     make(chan bool, 1),
-		_qReadyOnce: sync.Once{},
+	return &queue{
+		l: newLogger(l, "queue"),
+
+		mu:        &sync.Mutex{},
+		closeOnce: sync.Once{},
+		readyOnce: sync.Once{},
+
+		collection: make(chan *genJob, capacity),
+		readyChan:  make(chan bool, 1),
 	}
 }
 
-func (p *queue) Enqueue(j *genJob) {
-	if p._qClosed {
+func (q *queue) Enqueue(j *genJob) {
+	if q.isClosed {
 		panic("queue is closed")
 	}
-	p._q <- j
+	defer q.l.Ack("enqueue<-", j)
+
+	q.collection <- j
 }
 
-func (p *queue) Dequeue() (*genJob, bool) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+func (q *queue) Dequeue(wid int) (*genJob, bool) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
 
-	j := <-p._q
+	j := <-q.collection
 	if j == nil {
-		if p._qClosed {
+		if q.isClosed {
 			return nil, false
 		}
 		panic("queue: race condition")
 	}
+	defer q.l.Ack(fmt.Sprintf("dequeue->worker_%d", wid), j)
+
 	return j, true
 }
 
-func (p *queue) Size() int {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	return len(p._q)
+func (q *queue) Size() int {
+	return len(q.collection)
 }
 
-func (p *queue) Ready() {
-	p._qReadyOnce.Do(func() { p._qReady <- true })
+func (q *queue) Ready() {
+	q.readyOnce.Do(func() {
+		defer q.l.Log("ready", "msg", "queue is ready", "size", q.Size())
+
+		q.readyChan <- true
+	})
 }
 
-func (p *queue) WaitReadiness() {
-	<-p._qReady
+func (q *queue) WaitReadiness() {
+	<-q.readyChan
 }
 
-func (p *queue) Close() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+func (q *queue) Close() {
+	q.mu.Lock()
+	defer q.mu.Unlock()
 
-	p._qOnce.Do(func() {
-		close(p._q)
-		p._qClosed = true
+	q.closeOnce.Do(func() {
+		defer q.l.Log("close", "msg", "queue is closed", "remaining", q.Size())
+
+		close(q.collection)
+		q.isClosed = true
 	})
 }

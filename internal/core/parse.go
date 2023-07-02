@@ -1,6 +1,7 @@
 package core
 
 import (
+	"github.com/codegen/internal/core/slog"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 	"os"
@@ -15,7 +16,7 @@ const (
 var validate = newValidator()
 
 // NewSpec parses the .codegen directory and returns a `Spec`.
-func NewSpec(src string) (spec *Spec, err error) {
+func NewSpec(l slog.ILogger, src string) (spec *Spec, err error) {
 	spec = newSpec()
 
 	// Establish presence of configuration directory.
@@ -26,23 +27,25 @@ func NewSpec(src string) (spec *Spec, err error) {
 	if src != "" {
 		cwd += "/" + src
 	}
-	cfgDirPath := cwd + "/" + DomainDir
-	if _, err = os.Stat(cfgDirPath); os.IsNotExist(err) {
+	cdp := cwd + "/" + DomainDir
+	l.Log(slog.OriginDomain("parse"), "dir", cdp)
+
+	if _, err = os.Stat(cdp); os.IsNotExist(err) {
 		err = errors.Wrapf(err, "failed to locate '%s' directory", DomainDir)
 		return
 	}
-	spec.Metadata.CodegenDir = cfgDirPath
+	spec.Metadata.CodegenDir = cdp
 	spec.Metadata.Cwd = cwd
 
 	// Parse generator specification.
-	if err = unmarshal(cfgDirPath+"/config.yaml", spec.Config, true); err != nil {
+	if err = unmarshal(cdp+"/config.yaml", spec.Config, true); err != nil {
 		return
 	}
 
 	// Parse all packages.
 	//
 	// /!\ Assumes a flat directory structure.
-	err = filepath.Walk(cfgDirPath+"/pkg", func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(cdp+"/pkg", func(path string, info os.FileInfo, err error) error {
 		// Handle unexpected error.
 		if err != nil {
 			return errors.Wrapf(err, "unexpected error during dir walk at file '%s'", path)
