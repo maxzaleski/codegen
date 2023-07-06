@@ -2,12 +2,11 @@ package main
 
 import (
 	"flag"
+	"github.com/maxzaleski/codegen/pkg/gen"
+	"github.com/maxzaleski/codegen/pkg/output"
 	"os"
 	"text/template"
 	"time"
-
-	"github.com/codegen/pkg/gen"
-	"github.com/codegen/pkg/output"
 )
 
 var (

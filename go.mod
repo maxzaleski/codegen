@@ -1,4 +1,4 @@
-module github.com/codegen
+module github.com/maxzaleski/codegen
 
 go 1.19
 
