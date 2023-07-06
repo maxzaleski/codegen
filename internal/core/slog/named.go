@@ -2,6 +2,7 @@ package slog
 
 import (
 	"fmt"
+	"github.com/iancoleman/strcase"
 	"strings"
 )
 
@@ -12,25 +13,32 @@ type (
 	INamedLogger interface {
 		// Log logs an event.
 		Log(event string, lines ...any)
+		// Parent returns the parent logger.
+		Parent() ILogger
 	}
 
 	namedLogger struct {
 		*logger
 
 		namespace string
+		colour    Colour
 	}
 )
 
-func NewNamed(p ILogger, ns string) INamedLogger {
+func NewNamed(p ILogger, ns string, c Colour) INamedLogger {
 	return &namedLogger{
 		logger:    p.(*logger),
 		namespace: ns,
+		colour:    c,
 	}
 }
 
 func (l *namedLogger) Log(event string, fields ...interface{}) {
 	if event == "" {
 		l.panic("event cannot be empty")
+	}
+	if len(fields)%2 != 0 {
+		l.panic("fields must be key-value pairs")
 	}
 
 	// Transform log fields into a printable string,
@@ -45,7 +53,7 @@ func (l *namedLogger) Log(event string, fields ...interface{}) {
 				l.panic("field key must be a string")
 			}
 
-			fs := f.(string)
+			fs := strcase.ToSnake(f.(string))
 			if s, ok := val.(string); ok && !strings.Contains(fs, "file") {
 				val = fmt.Sprintf("'%s'", s)
 			}
@@ -54,11 +62,23 @@ func (l *namedLogger) Log(event string, fields ...interface{}) {
 		}
 	}
 
+	oc := Purple
+	if l.colour != "" {
+		oc = l.colour
+	}
+	ec := Blue
+	if strings.Contains(event, "error") {
+		ec = Red
+	}
 	l.logger.Log(
-		domain(Purple, "origin", l.namespace),
-		domain(Blue, "event", event),
+		domain(oc, "origin", l.namespace),
+		domain(ec, "event", event),
 		fieldsS,
 	)
+}
+
+func (l *namedLogger) Parent() ILogger {
+	return l.logger
 }
 
 func (l *namedLogger) panic(msg string) {

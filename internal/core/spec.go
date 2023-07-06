@@ -228,6 +228,8 @@ const (
 	EntityScopeProtected EntityScope = "protected"
 )
 
+const UniquePkgAlias = "[unique]"
+
 type Package struct {
 	Entity    `yaml:",inline"`
 	Models    []Model    `yaml:"models,omitempty" validate:"dive"`

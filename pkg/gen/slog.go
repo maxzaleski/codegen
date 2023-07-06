@@ -11,6 +11,10 @@ type (
 
 		// Ack logs an acknowledgement event.
 		Ack(event string, j *genJob, fields ...any)
+		// NamedParent returns the parent (named) logger.
+		NamedParent() slog.INamedLogger
+		// Parent returns the parent logger.
+		Parent() slog.ILogger
 	}
 
 	logger struct {
@@ -19,8 +23,8 @@ type (
 )
 
 // New creates a new logger specific to the `gen` package.
-func newLogger(p slog.ILogger, ns string) ILogger {
-	return &logger{slog.NewNamed(p, ns)}
+func newLogger(p slog.ILogger, ns string, co slog.Colour) ILogger {
+	return &logger{slog.NewNamed(p, ns, co)}
 }
 
 func (l *logger) Ack(event string, j *genJob, fields ...any) {
@@ -29,4 +33,12 @@ func (l *logger) Ack(event string, j *genJob, fields ...any) {
 	fieldsCopy[2], fieldsCopy[3] = "job", j.Key
 	fieldsCopy = append(fieldsCopy, fields...)
 	l.Log(event, fieldsCopy...)
+}
+
+func (l *logger) NamedParent() slog.INamedLogger {
+	return l.INamedLogger
+}
+
+func (l *logger) Parent() slog.ILogger {
+	return l.INamedLogger.Parent()
 }

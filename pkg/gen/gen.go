@@ -4,21 +4,24 @@ import (
 	"context"
 	"github.com/codegen/internal/core/slog"
 	"github.com/codegen/internal/metrics"
+	"github.com/codegen/internal/utils"
 	"github.com/pkg/errors"
 	"time"
 
 	"github.com/codegen/internal/core"
 )
 
-var aggrScopes []*domainScope
-
 type (
-	// Config represents the setup configuration .
+	// Config represents the tool's configuration .
 	Config struct {
-		Location         string
-		WorkerCount      int
-		DisableTemplates bool
-		DebugMode        bool
+		DebugMode          bool
+		DebugWorkerMetrics bool
+		DeleteTmp          bool
+		DisableTemplates   bool
+		Location           string
+		WorkerCount        int
+
+		TemplateFuncMap map[string]interface{}
 	}
 
 	domainScope struct {
@@ -27,49 +30,68 @@ type (
 	}
 )
 
+const (
+	contextKeyBegan    utils.ContextKey = "began"
+	contextKeyLogger   utils.ContextKey = "logger"
+	contextKeyMetrics  utils.ContextKey = "metrics"
+	contextKeyPackages utils.ContextKey = "packages"
+)
+
 func Execute(c Config, began time.Time) (md *core.Metadata, _ metrics.IMetrics, _ error) {
 	sl := slog.New(c.DebugMode, began)
 
 	// Parse configuration via `.codegen` directory.
 	spec, err := core.NewSpec(sl, c.Location)
-	md = spec.Metadata
+	md = spec.Metadata // Always returned.
 	if err != nil {
 		err = errors.Wrapf(err, "failed to produce a new specification")
 		return
 	}
 
+	// Act upon the (dev) flag; delete tmp directory.
+	if c.DeleteTmp {
+		if err = removeTmpDir(md, sl); err != nil {
+			return
+		}
+	}
+
 	sc := spec.Config
 	hScopes, pScopes := sc.HttpDomain.Scopes, sc.PkgDomain.Scopes
-	aggrScopes = make([]*domainScope, 0, len(hScopes)+len(pScopes))
+	aggrScopes := make([]*domainScope, 0, len(hScopes)+len(pScopes))
 	aggrScopes = append(aggrScopes, mapToDomainScope(pScopes, core.DomainTypePkg)...)
 	aggrScopes = append(aggrScopes, mapToDomainScope(hScopes, core.DomainTypeHttp)...)
 
-	ms := metrics.New(nil)
+	ms := metrics.New()
 
 	ctx := context.Background()
-	ctx = context.WithValue(ctx, "began", began)
-	ctx = context.WithValue(ctx, "logger", sl)
-	ctx = context.WithValue(ctx, "metrics", ms)
-	ctx = context.WithValue(ctx, "packages", spec.Pkgs)
+	ctx = context.WithValue(ctx, contextKeyBegan, began)
+	ctx = context.WithValue(ctx, contextKeyLogger, sl)
+	ctx = context.WithValue(ctx, contextKeyMetrics, ms)
+	ctx = context.WithValue(ctx, contextKeyPackages, spec.Pkgs)
 
-	gs := newSetup(ctx, sl, c)
+	concierge := newConcierge(ctx, sl, c, aggrScopes)
 
 	// -> Guarantees output directories exist during execution.
-	gs.WalkDirectoryStructure(spec.Metadata, spec.Pkgs)
+	concierge.WalkDirectoryStructure(spec.Metadata, spec.Pkgs)
 
 	// -> Extract jobs and feed the queue.
-	gs.WgAdd(1)
-	go gs.ExtractJobs(spec)
+	concierge.WgAdd(1)
+	go concierge.ExtractJobs(spec)
 
 	// [blocking] wait for queue to be ready.
-	gs.WaitQueueReadiness()
+	concierge.WaitQueueReadiness()
 
 	// -> Start workers.
-	gs.WgAdd(1)
-	go gs.StartWorkers()
+	concierge.WgAdd(1)
+	go concierge.StartWorkers()
 
 	// [blocking] wait for all goroutines to finish.
-	gs.WaitAndCleanup()
+	concierge.WaitAndCleanup()
 
-	return md, ms, <-gs.GetErrChannel()
+	// Act upon the (dev) flag; print worker metrics.
+	if c.DebugMode && c.DebugWorkerMetrics {
+		printWorkerMetrics(ms, sl, c.WorkerCount)
+	}
+
+	return md, ms, <-concierge.GetErrChannel()
 }

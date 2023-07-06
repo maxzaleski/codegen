@@ -14,8 +14,9 @@ import (
 
 type (
 	templateFactory struct {
-		j    *genJob
-		pkgs []*core.Package
+		j       *genJob
+		pkgs    []*core.Package
+		funcMap template.FuncMap
 	}
 )
 

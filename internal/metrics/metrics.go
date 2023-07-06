@@ -1,70 +1,82 @@
 package metrics
 
-import "sync"
+import (
+	"fmt"
+	"github.com/codegen/internal/utils/slice"
+	"sync"
+)
 
 type (
-	PackageMeasurements = map[string][]*Measurement
+	OutcomesByPkg = map[string][]FileOutcome
 
 	IMetrics interface {
-		// ScopeKeys returns the list of scopes for which metrics have been recorded.
-		ScopeKeys() []string
-		// GetPackageMeasurements returns the collection of measurements for the specified scope.
-		GetPackageMeasurements(scope string) PackageMeasurements
+		// Keys returns the keys for the metricsMap.
+		Keys() []string
+		// Get returns the value for the specified key.
+		Get(string string) interface{}
+		// CaptureScope captures the generation outcome for the specified scope and package.
+		CaptureScope(scope, pkg string, o FileOutcome)
+		// CaptureWorker increments the jobs (performed) count for the specified worker ID.
+		CaptureWorker(wID int)
 	}
 
 	Metrics struct {
 		mu *sync.Mutex
 
-		seen map[string]interface{}
+		metricsMap map[string]interface{}
 	}
 
-	Measurement struct {
-		FileAbsolutePath string
-		Created          bool
+	FileOutcome struct {
+		AbsolutePath string
+		Created      bool
 	}
 )
 
 var _ IMetrics = (*Metrics)(nil)
 
-func New(seen map[string]interface{}) *Metrics {
-	if seen == nil {
-		seen = map[string]interface{}{}
-	}
+func New() *Metrics {
 	return &Metrics{
-		mu:   &sync.Mutex{},
-		seen: seen,
+		mu:         &sync.Mutex{},
+		metricsMap: map[string]interface{}{},
 	}
 }
 
-func (m *Metrics) Measure(scope, pkg string, mrt *Measurement) {
+func (m *Metrics) CaptureScope(scope, pkg string, o FileOutcome) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	// Verbose code to avoid panics.
 	// Go's laws of reflection: https://go.dev/blog/laws-of-reflection
-	if m.seen[scope] == nil {
-		m.seen[scope] = make(PackageMeasurements)
+	if m.metricsMap[scope] == nil {
+		m.metricsMap[scope] = make(OutcomesByPkg)
 	}
-	if m.seen[scope].(PackageMeasurements)[pkg] == nil {
-		m.seen[scope].(PackageMeasurements)[pkg] = make([]*Measurement, 0)
+	if m.metricsMap[scope].(OutcomesByPkg)[pkg] == nil {
+		m.metricsMap[scope].(OutcomesByPkg)[pkg] = make([]FileOutcome, 0)
 	}
-	m.seen[scope].(PackageMeasurements)[pkg] = append(m.seen[scope].(PackageMeasurements)[pkg], mrt)
+	m.metricsMap[scope].(OutcomesByPkg)[pkg] = append(m.metricsMap[scope].(OutcomesByPkg)[pkg], o)
 }
 
-func (m *Metrics) ScopeKeys() []string {
+func (m *Metrics) CaptureWorker(wID int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	keys := make([]string, 0, len(m.seen))
-	for k := range m.seen {
-		keys = append(keys, k)
+	wIDs := fmt.Sprintf("worker_%d", wID)
+	if m.metricsMap[wIDs] == nil {
+		m.metricsMap[wIDs] = 0
 	}
-	return keys
+	m.metricsMap[wIDs] = m.metricsMap[wIDs].(int) + 1
 }
 
-func (m *Metrics) GetPackageMeasurements(key string) PackageMeasurements {
+func (m *Metrics) Keys() []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	return m.seen[key].(PackageMeasurements)
+	return slice.MapKeys(m.metricsMap)
+}
+
+func (m *Metrics) Get(key string) interface{} {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return m.metricsMap[key]
 }

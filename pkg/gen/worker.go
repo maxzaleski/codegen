@@ -17,11 +17,12 @@ func worker(ctx context.Context, id int, wg *sync.WaitGroup, q IQueue, errChan c
 	defer wg.Done()
 
 	pkgs, m, l :=
-		ctx.Value("packages").([]*core.Package),
-		ctx.Value("metrics").(*metrics.Metrics),
+		ctx.Value(contextKeyPackages).([]*core.Package),
+		ctx.Value(contextKeyMetrics).(*metrics.Metrics),
 		newLogger(
-			ctx.Value("logger").(slog.ILogger),
+			ctx.Value(contextKeyLogger).(slog.ILogger),
 			fmt.Sprintf("worker_%d", id),
+			slog.None,
 		)
 
 	l.Log("start", "msg", "starting worker")
@@ -33,24 +34,26 @@ func worker(ctx context.Context, id int, wg *sync.WaitGroup, q IQueue, errChan c
 			return
 		default:
 			code := func() (code int) {
-				j, ok := q.Dequeue(id)
-				if !ok {
-					return -1
+				j := q.Dequeue(id)
+				if j == nil {
+					return -1 // queue is empty; all jobs processed.
 				}
 
 				setFileAbsolutePath(j)
 				l.Ack("ack<-", j)
 
-				mrt, sk := &metrics.Measurement{FileAbsolutePath: j.FileAbsolutePath}, j.Metadata.ScopeKey
+				o, sk :=
+					&metrics.FileOutcome{AbsolutePath: j.FileAbsolutePath},
+					j.Metadata.ScopeKey
 				if s := strings.Split(sk, "/"); len(s) == 2 {
 					sk = s[0]
 				}
 				defer func() {
-					tag := "[unique]"
+					tag := core.UniquePkgAlias
 					if p := j.Package; p != nil {
 						tag = p.Name
 					}
-					m.Measure(sk, tag, mrt)
+					m.CaptureScope(sk, tag, *o)
 				}()
 
 				if err := generateFile(pkgs, l, j); err != nil {
@@ -63,7 +66,7 @@ func worker(ctx context.Context, id int, wg *sync.WaitGroup, q IQueue, errChan c
 				}
 				defer logFileOutcome(l, fileOutcomeSuccess, j)
 
-				mrt.Created = true
+				o.Created = true
 				return
 			}()
 			if code != 0 {
@@ -85,7 +88,10 @@ func generateFile(pkgs []*core.Package, l ILogger, j *genJob) error {
 		return errFileAlreadyPresent
 	}
 
-	return (templateFactory{j, pkgs}).ExecuteTemplate()
+	return (templateFactory{
+		j,
+		pkgs,
+		nil}).ExecuteTemplate()
 }
 
 func setFileAbsolutePath(j *genJob) {

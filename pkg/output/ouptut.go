@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/codegen/internal"
 	"github.com/codegen/internal/core"
 )
 
@@ -59,7 +58,7 @@ func (c *client) PrintError(err error) {
 		slog.Atom(slog.Red, eventPrefix("🫣"), "You've encountered an error:", msg),
 		infoAtom("🐞",
 			fmt.Sprintf("Please check the error log file %s for the complete stracktrace.", c.getLogDest()),
-			fmt.Sprintf("If the issue persists, please do report it to me: %s 👈", slog.Atom(slog.Cyan, internal.GHIssuesURL)),
+			fmt.Sprintf("If the issue persists, please do report it to me: %s 👈", slog.Atom(slog.Cyan, utils.GHIssuesURL)),
 		))
 }
 
@@ -97,26 +96,27 @@ func (c *client) writeLog(err1 error) {
 	}
 }
 
-func (c *client) PrintFinalReport(m metrics.IMetrics) {
+func (c *client) PrintFinalReport(ms metrics.IMetrics) {
 	// Alphabetically sort the packages.
-	keys := m.ScopeKeys()
-	sort.Strings(keys)
+	scopes := slice.Filter(ms.Keys(), func(s string) bool { return !strings.HasPrefix(s, "worker_") })
+	sort.Strings(scopes)
 
 	// Print metrics per package.
-	totalFiles, totalPkgs := 0, 0
-	for _, scope := range m.ScopeKeys() {
-		printScope(scope)
+	totalFiles, seenPkgsMap := 0, make(map[string]bool)
+	for _, s := range scopes {
+		printScope(s)
 
-		pkgs := m.GetPackageMeasurements(scope)
-		for pkg := range pkgs {
+		obp := ms.Get(s).(metrics.OutcomesByPkg)
+		for pkg := range obp {
 			printPkg(pkg)
 
-			mrts := pkgs[pkg]
-			if len(mrts) != 0 {
-				totalPkgs++
+			if len(obp[pkg]) != 0 && pkg != core.UniquePkgAlias {
+				if !seenPkgsMap[pkg] {
+					seenPkgsMap[pkg] = true
+				}
 			}
-			for _, mrt := range pkgs[pkg] {
-				printFile(mrt.FileAbsolutePath, mrt.Created)
+			for _, mrt := range obp[pkg] {
+				printFile(mrt.AbsolutePath, mrt.Created)
 				if mrt.Created {
 					totalFiles++
 				}
@@ -135,7 +135,7 @@ func (c *client) PrintFinalReport(m metrics.IMetrics) {
 		fmt.Printf("\n%s Generated %s across %s in %s.\n",
 			eventPrefix("🤓"),
 			slog.Atom(slog.Blue, fmt.Sprintf("%d files", totalFiles)),
-			slog.Atom(slog.Blue, fmt.Sprintf("%d packages", totalPkgs)),
+			slog.Atom(slog.Blue, fmt.Sprintf("%d packages", len(slice.MapKeys(seenPkgsMap)))),
 			slog.Atom(slog.Cyan, time.Since(c.began).String()),
 		)
 	}

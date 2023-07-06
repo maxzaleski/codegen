@@ -9,9 +9,25 @@ func Map[T, U any](ts []T, f func(T) U) []U {
 	return us
 }
 
-// ForEach is a generic function that iterates over a slice of type T.
-func ForEach[T any](ts []T, f func(i int, t T)) {
-	for i, t := range ts {
-		f(i, t)
+// MapKeys is a generic function that maps a map of type T to a slice of type T.
+func MapKeys[T comparable, U any](m map[T]U) []T {
+	keys := make([]T, len(m))
+
+	i := 0
+	for k := range m {
+		keys[i] = k
+		i++
 	}
+	return keys
+}
+
+// Filter is a generic function that filters a slice of type T.
+func Filter[T any](ts []T, f func(T) bool) []T {
+	var us []T
+	for _, t := range ts {
+		if f(t) {
+			us = append(us, t)
+		}
+	}
+	return us
 }

@@ -21,7 +21,7 @@ var validate = newValidator()
 func NewSpec(rl slog.ILogger, src string) (spec *Spec, err error) {
 	spec = newSpec() // Always returned.
 
-	l := slog.NewNamed(rl, "core")
+	l := slog.NewNamed(rl, "core", "")
 	l.Log(event, "msg", "parsing configuration")
 	defer func() {
 		if err == nil {
