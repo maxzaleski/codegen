@@ -2,11 +2,11 @@ package gen
 
 import (
 	"bytes"
-	"github.com/codegen/internal/core"
-	"github.com/codegen/internal/embeds"
-	"github.com/codegen/internal/fs"
-	"github.com/codegen/internal/utils/slice"
-	"github.com/codegen/pkg/gen/partials"
+	"github.com/maxzaleski/codegen/internal/core"
+	"github.com/maxzaleski/codegen/internal/embeds"
+	"github.com/maxzaleski/codegen/internal/fs"
+	"github.com/maxzaleski/codegen/internal/utils/slice"
+	"github.com/maxzaleski/codegen/pkg/gen/partials"
 	"github.com/pkg/errors"
 	"strings"
 	"text/template"

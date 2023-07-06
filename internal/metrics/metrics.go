@@ -2,7 +2,7 @@ package metrics
 
 import (
 	"fmt"
-	"github.com/codegen/internal/utils/slice"
+	"github.com/maxzaleski/codegen/internal/utils/slice"
 	"sync"
 )
 

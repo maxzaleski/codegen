@@ -1,7 +1,7 @@
 package gen
 
 import (
-	"github.com/codegen/internal/core/slog"
+	"github.com/maxzaleski/codegen/internal/core/slog"
 )
 
 type (

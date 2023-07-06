@@ -2,8 +2,8 @@ package core
 
 import (
 	"fmt"
-	"github.com/codegen/internal/utils/slice"
 	"github.com/go-playground/validator/v10"
+	"github.com/maxzaleski/codegen/internal/utils/slice"
 	"reflect"
 	"regexp"
 	"strings"

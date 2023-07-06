@@ -2,18 +2,18 @@ package output
 
 import (
 	"fmt"
-	"github.com/codegen/internal/core/slog"
-	"github.com/codegen/internal/fs"
-	"github.com/codegen/internal/metrics"
-	"github.com/codegen/internal/utils"
-	"github.com/codegen/internal/utils/slice"
 	"github.com/go-playground/validator/v10"
+	"github.com/maxzaleski/codegen/internal/core/slog"
+	"github.com/maxzaleski/codegen/internal/fs"
+	"github.com/maxzaleski/codegen/internal/metrics"
+	"github.com/maxzaleski/codegen/internal/utils"
+	"github.com/maxzaleski/codegen/internal/utils/slice"
 	"os"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/codegen/internal/core"
+	"github.com/maxzaleski/codegen/internal/core"
 )
 
 type (

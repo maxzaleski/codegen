@@ -2,9 +2,9 @@ package gen
 
 import (
 	"fmt"
-	"github.com/codegen/internal/core"
-	"github.com/codegen/internal/core/slog"
-	"github.com/codegen/internal/metrics"
+	"github.com/maxzaleski/codegen/internal/core"
+	"github.com/maxzaleski/codegen/internal/core/slog"
+	"github.com/maxzaleski/codegen/internal/metrics"
 	"math"
 	"sync"
 )

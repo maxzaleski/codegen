@@ -2,13 +2,13 @@ package gen
 
 import (
 	"context"
-	"github.com/codegen/internal/core/slog"
-	"github.com/codegen/internal/metrics"
-	"github.com/codegen/internal/utils"
+	"github.com/maxzaleski/codegen/internal/core/slog"
+	"github.com/maxzaleski/codegen/internal/metrics"
+	"github.com/maxzaleski/codegen/internal/utils"
 	"github.com/pkg/errors"
 	"time"
 
-	"github.com/codegen/internal/core"
+	"github.com/maxzaleski/codegen/internal/core"
 )
 
 type (

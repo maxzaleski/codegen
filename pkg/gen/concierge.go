@@ -3,11 +3,11 @@ package gen
 import (
 	"context"
 	"fmt"
-	"github.com/codegen/internal/core"
-	"github.com/codegen/internal/core/slog"
-	"github.com/codegen/internal/fs"
-	"github.com/codegen/internal/metrics"
-	"github.com/codegen/internal/utils/slice"
+	"github.com/maxzaleski/codegen/internal/core"
+	"github.com/maxzaleski/codegen/internal/core/slog"
+	"github.com/maxzaleski/codegen/internal/fs"
+	"github.com/maxzaleski/codegen/internal/metrics"
+	"github.com/maxzaleski/codegen/internal/utils/slice"
 	"sync"
 )
 

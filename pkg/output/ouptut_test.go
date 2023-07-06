@@ -1,8 +1,8 @@
 package output
 
 import (
-	"github.com/codegen/internal/core"
-	"github.com/codegen/internal/metrics"
+	"github.com/maxzaleski/codegen/internal/core"
+	"github.com/maxzaleski/codegen/internal/metrics"
 	"os"
 	"testing"
 	"time"
