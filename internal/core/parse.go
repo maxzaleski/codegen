@@ -96,7 +96,16 @@ func NewSpec(rl slog.ILogger, src string) (spec *Spec, err error) {
 		return
 	}
 
-	err = validate.Struct(spec.Config) // Validate the resulting struct.
+	// Assign domain types.
+	for _, s := range spec.Config.PkgDomain.Scopes {
+		s.Type = DomainTypePkg
+	}
+	for _, s := range spec.Config.HttpDomain.Scopes {
+		s.Type = DomainTypeHttp
+	}
+
+	// Validate the resulting struct.
+	err = validate.Struct(spec.Config)
 	return
 }
 

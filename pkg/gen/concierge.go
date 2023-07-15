@@ -8,6 +8,7 @@ import (
 	"github.com/maxzaleski/codegen/internal/fs"
 	"github.com/maxzaleski/codegen/internal/metrics"
 	"github.com/maxzaleski/codegen/internal/utils/slice"
+	"github.com/maxzaleski/codegen/pkg/gen/queue"
 	"sync"
 )
 
@@ -30,15 +31,15 @@ type (
 		errChan chan error
 		wg      *sync.WaitGroup
 
-		queue      IQueue
+		queue      queue.IQueue[genJob]
 		logger     ILogger
 		metrics    metrics.IMetrics
-		aggrScopes []*domainScope
+		aggrScopes []*core.DomainScope
 	}
 )
 
 // newConcierge returns a new instance of IConcierge.
-func newConcierge(ctx1 context.Context, rl slog.ILogger, c Config, as []*domainScope) IConcierge {
+func newConcierge(ctx1 context.Context, rl slog.ILogger, c Config, as []*core.DomainScope) IConcierge {
 	ms := ctx1.Value(contextKeyMetrics).(*metrics.Metrics)
 
 	ctx2, cancel := context.WithCancel(ctx1)
@@ -49,7 +50,7 @@ func newConcierge(ctx1 context.Context, rl slog.ILogger, c Config, as []*domainS
 		errChan: make(chan error, 1),
 		wg:      &sync.WaitGroup{},
 
-		queue:      newQueue(rl, ms, c),
+		queue:      newGenQueue(rl, ms, c),
 		logger:     newLogger(rl, "concierge", slog.Pink),
 		metrics:    ms,
 		aggrScopes: as,
@@ -117,10 +118,10 @@ func (c *runtimeConcierge) ExtractJobs(spec *core.Spec) {
 
 			for _, as := range c.aggrScopes {
 				j := genJob{
-					Metadata: Metadata{
+					Metadata: metadata{
 						AbsolutePath: as.AbsoluteOutput,
 						Inline:       as.Inline,
-						DomainType:   as.DomainType,
+						DomainType:   as.Type,
 						Metadata:     *spec.Metadata,
 						ScopeKey:     as.Key,
 					},
@@ -129,7 +130,7 @@ func (c *runtimeConcierge) ExtractJobs(spec *core.Spec) {
 
 				for _, sj := range as.Jobs {
 					// This check prevents the job from being executed for each package.
-					if as.DomainType == core.DomainTypeHttp && sj.Unique {
+					if as.Type == core.DomainTypeHttp && sj.Unique {
 						if ok, _ := sJs[as.Key]; ok {
 							return
 						}

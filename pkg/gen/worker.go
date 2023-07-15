@@ -13,7 +13,7 @@ import (
 	"sync"
 )
 
-func worker(ctx context.Context, id int, wg *sync.WaitGroup, q IQueue, errChan chan<- error) {
+func worker(ctx context.Context, id int, wg *sync.WaitGroup, q IGenQueue, errChan chan<- error) {
 	defer wg.Done()
 
 	pkgs, m, l :=
@@ -88,10 +88,12 @@ func generateFile(pkgs []*core.Package, l ILogger, j *genJob) error {
 		return errFileAlreadyPresent
 	}
 
-	return (templateFactory{
-		j,
-		pkgs,
-		nil}).ExecuteTemplate()
+	tf := templateFactory{
+		j:       j,
+		pkgs:    pkgs,
+		funcMap: nil,
+	}
+	return tf.ExecuteTemplate()
 }
 
 func setFileAbsolutePath(j *genJob) {

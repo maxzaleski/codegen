@@ -6,6 +6,7 @@ import (
 	"github.com/maxzaleski/codegen/internal/metrics"
 	"github.com/maxzaleski/codegen/internal/utils"
 	"github.com/pkg/errors"
+	"text/template"
 	"time"
 
 	"github.com/maxzaleski/codegen/internal/core"
@@ -21,12 +22,7 @@ type (
 		Location           string
 		WorkerCount        int
 
-		TemplateFuncMap map[string]interface{}
-	}
-
-	domainScope struct {
-		*core.DomainScope
-		DomainType core.DomainType
+		TemplateFuncMap template.FuncMap
 	}
 )
 
@@ -44,8 +40,7 @@ func Execute(c Config, began time.Time) (md *core.Metadata, _ metrics.IMetrics, 
 	spec, err := core.NewSpec(sl, c.Location)
 	md = spec.Metadata // Always returned.
 	if err != nil {
-		err = errors.Wrapf(err, "failed to produce a new specification")
-		return
+		return md, nil, errors.Wrapf(err, "failed to produce a new specification")
 	}
 
 	// Act upon the (dev) flag; delete tmp directory.
@@ -56,10 +51,11 @@ func Execute(c Config, began time.Time) (md *core.Metadata, _ metrics.IMetrics, 
 	}
 
 	sc := spec.Config
+
 	hScopes, pScopes := sc.HttpDomain.Scopes, sc.PkgDomain.Scopes
-	aggrScopes := make([]*domainScope, 0, len(hScopes)+len(pScopes))
-	aggrScopes = append(aggrScopes, mapToDomainScope(pScopes, core.DomainTypePkg)...)
-	aggrScopes = append(aggrScopes, mapToDomainScope(hScopes, core.DomainTypeHttp)...)
+	aggrScopes := make([]*core.DomainScope, len(hScopes)+len(pScopes))
+	aggrScopes = append(aggrScopes, hScopes...)
+	aggrScopes = append(aggrScopes, pScopes...)
 
 	ms := metrics.New()
 
@@ -85,7 +81,7 @@ func Execute(c Config, began time.Time) (md *core.Metadata, _ metrics.IMetrics, 
 	concierge.WgAdd(1)
 	go concierge.StartWorkers()
 
-	// [blocking] wait for all goroutines to finish.
+	// [blocking] wait for all goroutines to terminate.
 	concierge.WaitAndCleanup()
 
 	// Act upon the (dev) flag; print worker metrics.

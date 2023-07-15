@@ -12,7 +12,7 @@ type (
 	// It differs from the default `ILogger` by providing a namespace to subsequent logs.
 	INamedLogger interface {
 		// Log logs an event.
-		Log(event string, lines ...any)
+		Log(event string, fields ...any)
 		// Parent returns the parent logger.
 		Parent() ILogger
 	}

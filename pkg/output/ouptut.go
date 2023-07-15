@@ -54,7 +54,7 @@ func (c *client) PrintError(err error) {
 				"\n")
 		}
 	}
-	fmt.Printf("%s%s\n",
+	fmt.Printf("\n%s%s\n",
 		slog.Atom(slog.Red, eventPrefix("🫣"), "You've encountered an error:", msg),
 		infoAtom("🐞",
 			fmt.Sprintf("Please check the error log file %s for the complete stracktrace.", c.getLogDest()),

@@ -31,3 +31,13 @@ func Filter[T any](ts []T, f func(T) bool) []T {
 	}
 	return us
 }
+
+// Contains is a generic function that checks if a slice of type T contains a value of type T.
+func Contains[T comparable](ts []T, t T) bool {
+	for _, tt := range ts {
+		if tt == t {
+			return true
+		}
+	}
+	return false
+}

@@ -68,5 +68,5 @@ func (l *logger) Logf(format string, a ...any) {
 }
 
 func (l *logger) LogEnv(descriptor, flag string, msg string) {
-	l.Log(Atom(Red, fmt.Sprintf("[env] %s flag is set (-%s); %s", descriptor, flag, msg)))
+	l.Log(Atom(Blue, fmt.Sprintf("[env] %s flag is set (-%s); %s", descriptor, flag, msg)))
 }

@@ -53,13 +53,18 @@ type (
 type (
 	// ScopeJob represents a generic job to be performed under the current scope.
 	ScopeJob struct {
-		Key              string             `yaml:"key" validate:"required"`
-		FileName         *ScopeJobFileName  `yaml:",inline" validate:"dive"`
-		Templates        []ScopeJobTemplate `yaml:"templates" validate:"required,dive"`
-		DisableEmbeds    bool               `yaml:"disable-templates" validate:"boolean"`
-		Excludes         Exclusions         `yaml:"exclude" validate:"omitempty,alpha"`
-		Unique           bool               `yaml:"unique" validate:"boolean"`
-		FileAbsolutePath string             `yaml:"-"`
+		Key           string             `yaml:"key" validate:"required"`
+		FileName      *ScopeJobFileName  `yaml:",inline" validate:"dive"`
+		Templates     []ScopeJobTemplate `yaml:"templates" validate:"required,dive"`
+		DisableEmbeds bool               `yaml:"disable-templates" validate:"boolean"`
+		// Excludes is a list of packages that do not need to be considered for the current job.
+		Excludes []string `yaml:"exclude" validate:"omitempty,alpha"`
+		// Override is a flag that indicates whether the current job should override an existing file.
+		Override bool `yaml:"override" validate:"boolean"`
+		// OverrideOn indicates whether the job should override an existing file based on provided conditions.
+		OverrideOn       map[string]interface{} `yaml:"override-on" validate:"omitempty,dive"`
+		Unique           bool                   `yaml:"unique" validate:"boolean"`
+		FileAbsolutePath string                 `yaml:"-"`
 	}
 
 	ScopeJobTemplate struct {
@@ -78,6 +83,9 @@ type (
 		Token     string
 		Modifiers []CaseModifier
 	}
+
+	Overridable struct {
+	}
 )
 
 // Copy deep copies the struct instance.
@@ -88,17 +96,15 @@ func (s *ScopeJob) Copy() *ScopeJob {
 	return &sCopy
 }
 
-const modPkgReplacementToken = "pkg"
-
 func (jfn *ScopeJobFileName) Assign(key int, vals []string) bool {
 	mod := &FileNameMod{
 		Key:       key,
 		Token:     vals[0],
-		Modifiers: make([]CaseModifier, 0, len(vals)-1),
+		Modifiers: make([]CaseModifier, len(vals)-1),
 	}
 	for _, val := range vals[1:] {
-		isPrimary, isSecondary := PrimaryCaseModifier(val).IsValid(), SecondaryCaseModifier(val).IsValid()
-		if !isPrimary && !isSecondary {
+		if !PrimaryCaseModifier(val).IsValid() &&
+			!SecondaryCaseModifier(val).IsValid() {
 			return false
 		}
 		mod.Modifiers = append(mod.Modifiers, CaseModifier(val))
@@ -119,8 +125,9 @@ type (
 		Key            string      `yaml:"key" validate:"required"`
 		Output         string      `yaml:"output" validate:"required,dirlike"`
 		Inline         bool        `yaml:"inline" validate:"boolean"`
-		AbsoluteOutput string      `yaml:"-"`
 		Jobs           []*ScopeJob `yaml:"jobs" validate:"dive"`
+		AbsoluteOutput string      `yaml:"-"`
+		Type           DomainType  `yaml:"-"`
 	}
 
 	DomainType string
@@ -174,17 +181,6 @@ func (m SecondaryCaseModifier) IsValid() bool {
 	default:
 		return false
 	}
-}
-
-type Exclusions []string
-
-func (e Exclusions) Contains(val string) bool {
-	for _, el := range e {
-		if el == val {
-			return true
-		}
-	}
-	return false
 }
 
 // FnParameter represents a function argument.

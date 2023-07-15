@@ -1,8 +1,6 @@
-package gen
+package queue
 
 import (
-	"fmt"
-	"github.com/maxzaleski/codegen/internal/core"
 	"github.com/maxzaleski/codegen/internal/core/slog"
 	"github.com/maxzaleski/codegen/internal/metrics"
 	"math"
@@ -10,11 +8,11 @@ import (
 )
 
 type (
-	IQueue interface {
+	IQueue[J any] interface {
 		// Enqueue enqueues a job.
-		Enqueue(j *genJob)
+		Enqueue(j *J)
 		// Dequeue blocks until a job is available. Returns nil if the queue is closed.
-		Dequeue(id int) *genJob
+		Dequeue(wID int) *J
 
 		// GetSize returns the number of jobs in the queue.
 		GetSize() int
@@ -31,78 +29,60 @@ type (
 		Ready()
 	}
 
-	queue struct {
-		l ILogger
+	queue[T any] struct {
+		mu       *sync.Mutex
+		capacity int
 
-		mu        *sync.Mutex
-		readyOnce sync.Once
-		closeOnce sync.Once
-
-		collection chan *genJob
+		collection chan *T
 		readyChan  chan any
 
+		nl      slog.INamedLogger
+		metrics *metrics.Metrics
+
 		// isClosed means the queue is no longer accepting jobs.
-		isClosed bool
+		isClosed  bool
+		closeOnce sync.Once
 		// isReady means the queue is ready to be read from.
-		isReady bool
-
-		capacity int
-		metrics  *metrics.Metrics
-	}
-
-	genJob struct {
-		*core.ScopeJob
-
-		Metadata         Metadata
-		Package          *core.Package
-		DisableTemplates bool
-	}
-
-	Metadata struct {
-		core.Metadata
-
-		ScopeKey     string
-		DomainType   core.DomainType
-		AbsolutePath string
-		Inline       bool
+		isReady   bool
+		readyOnce sync.Once
 	}
 )
 
-var _ IQueue = (*queue)(nil)
+var _ IQueue[any] = (*queue[any])(nil)
 
-// newQueue creates a new queue.
+// New creates a new queue.
 //
-// The queue's capacity is set to `ceil(workerCount * 1.5)`.
-func newQueue(l slog.ILogger, m *metrics.Metrics, c Config) IQueue {
-	capacity := int(math.Ceil(float64(c.WorkerCount) * 1.5))
-	if c.DebugMode && c.WorkerCount < 10 { // Omit; prevents deadlock in debug mode.
+// The queue's capacity is set to `⌈workerCount * 1.5⌉`.
+func New[J any](nl slog.INamedLogger, m *metrics.Metrics, workerCount int) IQueue[J] {
+	capacity := int(math.Ceil(float64(workerCount) * 1.5))
+	if workerCount < 10 { // Omit; prevents deadlock in debug mode.
 		capacity = 10
 	}
 
-	return &queue{
-		l: newLogger(l, "queue", slog.None),
+	return &queue[J]{
+		mu:       &sync.Mutex{},
+		capacity: capacity,
 
-		mu:        &sync.Mutex{},
+		nl:      nl,
+		metrics: m,
+
 		closeOnce: sync.Once{},
 		readyOnce: sync.Once{},
 
-		collection: make(chan *genJob, capacity),
+		collection: make(chan *J, capacity),
 		readyChan:  make(chan any, 0),
-		metrics:    m,
-		capacity:   capacity,
 	}
 }
 
-func (q *queue) Enqueue(j *genJob) {
+func (q *queue[T]) Enqueue(j *T) {
 	if q.isClosed {
 		panic("queue is closed")
 	}
-	defer q.l.Ack("enqueue<-", j)
 
 	q.collection <- j // channels are thread-safe by default.
 }
 
-func (q *queue) Dequeue(wid int) *genJob {
+func (q *queue[T]) Dequeue(wID int) *T {
 	j := <-q.collection // channels are thread-safe by default.
 	if j == nil {
 		if q.isClosed {
@@ -110,29 +90,24 @@ func (q *queue) Dequeue(wid int) *genJob {
 		}
 		panic("queue: race condition")
 	}
-	defer func() {
-		q.l.Ack(
-			fmt.Sprintf("dequeue%s",
-				slog.Atom(slog.Purple, fmt.Sprintf("->worker_%d", wid))), j)
-		q.metrics.CaptureWorker(wid)
-	}()
+	defer q.metrics.CaptureWorker(wID)
 
 	return j
 }
 
-func (q *queue) GetSize() int {
+func (q *queue[T]) GetSize() int {
 	return len(q.collection)
 }
 
-func (q *queue) GetCapacity() int {
+func (q *queue[T]) GetCapacity() int {
 	return q.capacity
 }
 
-func (q *queue) GetReady() bool {
+func (q *queue[T]) GetReady() bool {
 	return q.isReady
 }
 
-func (q *queue) Ready() {
+func (q *queue[T]) Ready() {
 	q.readyOnce.Do(func() {
 		defer q.logState("ready", "queue is ready")
 
@@ -141,11 +116,11 @@ func (q *queue) Ready() {
 	})
 }
 
-func (q *queue) ReadyListener() <-chan any {
+func (q *queue[T]) ReadyListener() <-chan any {
 	return q.readyChan
 }
 
-func (q *queue) Close() {
+func (q *queue[T]) Close() {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -157,6 +132,6 @@ func (q *queue) Close() {
 	})
 }
 
-func (q *queue) logState(state string, msg string) {
-	q.l.Log(state, "msg", msg, "remaining", q.GetSize())
+func (q *queue[any]) logState(state string, msg string) {
+	q.nl.Log(state, "msg", msg, "remaining", q.GetSize())
 }
