@@ -17,7 +17,7 @@ func TestScopeJobFileName_Assign(t *testing.T) {
 	//		want: true,
 	//		wantStruct: &ScopeJobFileName{
 	//			Token:     "test",
-	//			Modifiers: []CaseModifier{CaseModifierLower},
+	//			Mods: []CaseModifier{CaseModifierLower},
 	//		},
 	//	},
 	//	{
@@ -26,7 +26,7 @@ func TestScopeJobFileName_Assign(t *testing.T) {
 	//		want: true,
 	//		wantStruct: &ScopeJobFileName{
 	//			Token:     "test",
-	//			Modifiers: []CaseModifier{CaseModifierSnake},
+	//			Mods: []CaseModifier{CaseModifierSnake},
 	//		},
 	//	},
 	//	{
@@ -35,7 +35,7 @@ func TestScopeJobFileName_Assign(t *testing.T) {
 	//		want: true,
 	//		wantStruct: &ScopeJobFileName{
 	//			Token:     "test",
-	//			Modifiers: []CaseModifier{CaseModifierUpper, CaseModifierSnake},
+	//			Mods: []CaseModifier{CaseModifierUpper, CaseModifierSnake},
 	//		},
 	//	},
 	//	{
@@ -44,7 +44,7 @@ func TestScopeJobFileName_Assign(t *testing.T) {
 	//		want: false,
 	//		wantStruct: &ScopeJobFileName{
 	//			Token:     "test",
-	//			Modifiers: []CaseModifier{},
+	//			Mods: []CaseModifier{},
 	//		},
 	//	},
 	//	{
@@ -53,17 +53,17 @@ func TestScopeJobFileName_Assign(t *testing.T) {
 	//		want: false,
 	//		wantStruct: &ScopeJobFileName{
 	//			Token:     "test",
-	//			Modifiers: []CaseModifier{CaseModifierSnake, CaseModifierUpper},
+	//			Mods: []CaseModifier{CaseModifierSnake, CaseModifierUpper},
 	//		},
 	//	},
 	//}
 	//for _, tt := range tests {
 	//	t.Run(tt.name, func(t *testing.T) {
 	//		s := &ScopeJobFileName{}
-	//		if ok := s.Assign(tt.vals); ok != tt.want {
-	//			t.Errorf("Assign() = %v, want %v", ok, tt.want)
+	//		if ok := s.AssignMod(tt.vals); ok != tt.want {
+	//			t.Errorf("AssignMod() = %v, want %v", ok, tt.want)
 	//		}
-	//		assert.Equal(t, s.Modifiers, tt.wantStruct.Modifiers)
+	//		assert.Equal(t, s.Mods, tt.wantStruct.Mods)
 	//	})
 	//}
 }

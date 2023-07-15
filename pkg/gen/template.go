@@ -21,7 +21,7 @@ type (
 )
 
 func (tf templateFactory) ExecuteTemplate() error {
-	jts, ext := tf.j.Templates, tf.j.FileName.Extension
+	jts := tf.j.Templates
 
 	// [dev] Execute an empty template.
 	if tf.j.DisableTemplates {
@@ -40,12 +40,6 @@ func (tf templateFactory) ExecuteTemplate() error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to parse primary template '%s'", pt)
 	}
-	// -> Include internal secondary template.
-	if !tf.j.DisableEmbeds {
-		if tt, err = embeds.Link(tt, ext); err != nil {
-			return err
-		}
-	}
 	// -> Include user-defined secondary templates.
 	if tt, err = tt.ParseFiles(ts...); err != nil {
 		return errors.Wrap(err, "failed to parse secondary templates")
@@ -55,7 +49,7 @@ func (tf templateFactory) ExecuteTemplate() error {
 }
 
 func (tf templateFactory) write(tt *template.Template) error {
-	funcs := partials.GetByExtension(tf.j.FileName.Extension)
+	funcs := partials.GetByExtension(tf.j.OutputFile.Ext)
 
 	var (
 		buf  bytes.Buffer
@@ -70,7 +64,7 @@ func (tf templateFactory) write(tt *template.Template) error {
 		ts := strings.Join(slice.Map(tt.Templates(), func(t *template.Template) string { return t.Name() }), ", ")
 		return errors.Wrapf(err, "failed to execute templates '%s'", ts)
 	}
-	if err := fs.CreateFile(tf.j.FileAbsolutePath, buf.Bytes()); err != nil {
+	if err := fs.CreateFile(tf.j.OutputFile.AbsolutePath, buf.Bytes()); err != nil {
 		return err
 	}
 	return nil

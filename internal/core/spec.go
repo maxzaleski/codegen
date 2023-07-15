@@ -53,65 +53,29 @@ type (
 type (
 	// ScopeJob represents a generic job to be performed under the current scope.
 	ScopeJob struct {
-		Key           string             `yaml:"key" validate:"required"`
-		FileName      *ScopeJobFileName  `yaml:",inline" validate:"dive"`
-		Templates     []ScopeJobTemplate `yaml:"templates" validate:"required,dive"`
-		DisableEmbeds bool               `yaml:"disable-templates" validate:"boolean"`
+		Key       string             `yaml:"key" validate:"required"`
+		FileName  string             `yaml:"file-name" validate:"required,filename"`
+		Templates []ScopeJobTemplate `yaml:"templates" validate:"required,dive"`
 		// Excludes is a list of packages that do not need to be considered for the current job.
 		Excludes []string `yaml:"exclude" validate:"omitempty,alpha"`
 		// Override is a flag that indicates whether the current job should override an existing file.
 		Override bool `yaml:"override" validate:"boolean"`
 		// OverrideOn indicates whether the job should override an existing file based on provided conditions.
-		OverrideOn       map[string]interface{} `yaml:"override-on" validate:"omitempty,dive"`
-		Unique           bool                   `yaml:"unique" validate:"boolean"`
-		FileAbsolutePath string                 `yaml:"-"`
+		OverrideOn map[string]interface{} `yaml:"override-on" validate:"omitempty,dive"`
+		Unique     bool                   `yaml:"unique" validate:"boolean"`
 	}
 
 	ScopeJobTemplate struct {
 		Primary bool   `yaml:"primary" validate:"boolean"`
 		Name    string `yaml:"name" validate:"required"`
 	}
-
-	ScopeJobFileName struct {
-		Value     string `yaml:"file-name" validate:"required,jobfilename"`
-		Extension string `yaml:"-"`
-		Mods      []*FileNameMod
-	}
-
-	FileNameMod struct {
-		Key       int
-		Token     string
-		Modifiers []CaseModifier
-	}
-
-	Overridable struct {
-	}
 )
 
 // Copy deep copies the struct instance.
 func (s *ScopeJob) Copy() *ScopeJob {
-	sCopy, fnCopy := *s, *s.FileName
-	sCopy.FileName = &fnCopy
+	sCopy := *s
 	copy(sCopy.Templates, s.Templates)
 	return &sCopy
-}
-
-func (jfn *ScopeJobFileName) Assign(key int, vals []string) bool {
-	mod := &FileNameMod{
-		Key:       key,
-		Token:     vals[0],
-		Modifiers: make([]CaseModifier, len(vals)-1),
-	}
-	for _, val := range vals[1:] {
-		if !PrimaryCaseModifier(val).IsValid() &&
-			!SecondaryCaseModifier(val).IsValid() {
-			return false
-		}
-		mod.Modifiers = append(mod.Modifiers, CaseModifier(val))
-	}
-	jfn.Mods = append(jfn.Mods, mod)
-
-	return true
 }
 
 type (
@@ -137,51 +101,6 @@ const (
 	DomainTypeHttp DomainType = "domain_http"
 	DomainTypePkg  DomainType = "domain_pkg"
 )
-
-const (
-	CaseModifierNone  CaseModifier = ""
-	CaseModifierLower CaseModifier = "asLower"
-	CaseModifierUpper CaseModifier = "asUpper"
-	CaseModifierTitle CaseModifier = "asTitle"
-
-	CaseModifierSnake CaseModifier = "asSnake"
-	CaseModifierCamel CaseModifier = "asCamel"
-	CaseModifierKebab CaseModifier = "asKebab"
-)
-
-type CaseModifier string
-
-func (m CaseModifier) IsValid() bool {
-	return PrimaryCaseModifier(m).IsValid() ||
-		SecondaryCaseModifier(m).IsValid()
-}
-
-type PrimaryCaseModifier CaseModifier
-
-func (m PrimaryCaseModifier) IsValid() bool {
-	switch CaseModifier(m) {
-	case CaseModifierNone,
-		CaseModifierLower,
-		CaseModifierUpper,
-		CaseModifierTitle:
-		return true
-	default:
-		return false
-	}
-}
-
-type SecondaryCaseModifier CaseModifier
-
-func (m SecondaryCaseModifier) IsValid() bool {
-	switch CaseModifier(m) {
-	case CaseModifierNone,
-		CaseModifierSnake,
-		CaseModifierCamel:
-		return true
-	default:
-		return false
-	}
-}
 
 // FnParameter represents a function argument.
 type FnParameter struct {

@@ -2,7 +2,6 @@ package gen
 
 import (
 	"fmt"
-	"github.com/maxzaleski/codegen/internal/core"
 	"github.com/maxzaleski/codegen/internal/core/slog"
 	"github.com/maxzaleski/codegen/internal/metrics"
 	"github.com/maxzaleski/codegen/pkg/gen/queue"
@@ -16,23 +15,6 @@ type (
 		queue.IQueue[genJob]
 
 		l ILogger
-	}
-
-	genJob struct {
-		*core.ScopeJob
-
-		Metadata         metadata
-		Package          *core.Package
-		DisableTemplates bool
-	}
-
-	metadata struct {
-		core.Metadata
-
-		ScopeKey     string
-		DomainType   core.DomainType
-		AbsolutePath string
-		Inline       bool
 	}
 )
 

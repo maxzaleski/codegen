@@ -6,6 +6,7 @@ import (
 	"github.com/maxzaleski/codegen/internal/metrics"
 	"github.com/maxzaleski/codegen/internal/utils"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 	"text/template"
 	"time"
 
@@ -40,7 +41,8 @@ func Execute(c Config, began time.Time) (md *core.Metadata, _ metrics.IMetrics, 
 	spec, err := core.NewSpec(sl, c.Location)
 	md = spec.Metadata // Always returned.
 	if err != nil {
-		return md, nil, errors.Wrapf(err, "failed to produce a new specification")
+		err = errors.Wrapf(err, "failed to produce a new specification")
+		return
 	}
 
 	// Act upon the (dev) flag; delete tmp directory.
@@ -53,41 +55,42 @@ func Execute(c Config, began time.Time) (md *core.Metadata, _ metrics.IMetrics, 
 	sc := spec.Config
 
 	hScopes, pScopes := sc.HttpDomain.Scopes, sc.PkgDomain.Scopes
-	aggrScopes := make([]*core.DomainScope, len(hScopes)+len(pScopes))
+	aggrScopes := make([]*core.DomainScope, 0, len(hScopes)+len(pScopes))
 	aggrScopes = append(aggrScopes, hScopes...)
 	aggrScopes = append(aggrScopes, pScopes...)
 
 	ms := metrics.New()
 
-	ctx := context.Background()
+	errg, ctx := errgroup.WithContext(context.Background())
 	ctx = context.WithValue(ctx, contextKeyBegan, began)
 	ctx = context.WithValue(ctx, contextKeyLogger, sl)
 	ctx = context.WithValue(ctx, contextKeyMetrics, ms)
 	ctx = context.WithValue(ctx, contextKeyPackages, spec.Pkgs)
 
-	concierge := newConcierge(ctx, sl, c, aggrScopes)
+	concierge := newConcierge(ctx, sl, errg, c, aggrScopes)
 
 	// -> Guarantees output directories exist during execution.
-	concierge.WalkDirectoryStructure(spec.Metadata, spec.Pkgs)
+	if err = concierge.WalkDirectoryStructure(spec.Metadata, spec.Pkgs); err != nil {
+		err = errors.Wrapf(err, "failed to walk directory structure")
+		return
+	}
 
 	// -> Extract jobs and feed the queue.
-	concierge.WgAdd(1)
-	go concierge.ExtractJobs(spec)
+	errg.Go(func() error { return concierge.ExtractJobs(spec) })
 
 	// [blocking] wait for queue to be ready.
 	concierge.WaitQueueReadiness()
 
 	// -> Start workers.
-	concierge.WgAdd(1)
-	go concierge.StartWorkers()
+	errg.Go(func() error { return concierge.StartWorkers() })
 
 	// [blocking] wait for all goroutines to terminate.
-	concierge.WaitAndCleanup()
-
-	// Act upon the (dev) flag; print worker metrics.
-	if c.DebugMode && c.DebugWorkerMetrics {
-		printWorkerMetrics(ms, sl, c.WorkerCount)
+	if err = concierge.WaitAndCleanup(); err == nil {
+		// Act upon the (dev) flag; print worker metrics.
+		if c.DebugMode && c.DebugWorkerMetrics {
+			defer printWorkerMetrics(ms, sl, c.WorkerCount)
+		}
 	}
 
-	return md, ms, <-concierge.GetErrChannel()
+	return md, ms, err
 }

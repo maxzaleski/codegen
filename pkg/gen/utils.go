@@ -19,7 +19,7 @@ const (
 type fileOutcome string
 
 func logFileOutcome(l ILogger, o fileOutcome, j *genJob) {
-	l.Ack("file", j, "status", string(o), "file", j.FileAbsolutePath)
+	l.Ack("file", j, "status", string(o), "file", j.OutputFile.AbsolutePath)
 }
 
 func removeTmpDir(md *core.Metadata, l slog.ILogger) error {

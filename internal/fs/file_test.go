@@ -28,7 +28,7 @@ func TestCreateFile(t *testing.T) {
 		t.Errorf("ReadFile(%s) returned an error: %v", dest, err)
 	}
 	if !bytes.Equal(actualData, data) {
-		t.Errorf("File contents don't match: expected '%s', got '%s'", string(data), string(actualData))
+		t.Errorf("OutputFile contents don't match: expected '%s', got '%s'", string(data), string(actualData))
 	}
 }
 

@@ -1,18 +1,16 @@
 package core
 
 import (
-	"fmt"
 	"github.com/go-playground/validator/v10"
-	"github.com/maxzaleski/codegen/internal/utils/slice"
 	"reflect"
 	"regexp"
 	"strings"
 )
 
 var (
-	dirLikeRegex       = regexp.MustCompile("^[aA-zZ\\d/]+$")
-	propTypeRegex      = regexp.MustCompile("^[aA-zZ\\d_-]+$")
-	parseFileNameRegex = regexp.MustCompile("\\\\{([aA-zZ]+\\.([aA-zZ]+\\.?)+)\\\\}")
+	dirLikeRegex  = regexp.MustCompile("^[aA-zZ\\d/]+$")
+	propTypeRegex = regexp.MustCompile("^[aA-zZ\\d_-]+$")
+	fileNameRegex = regexp.MustCompile("^.+\\.[aA-zZ]+$")
 )
 
 // newValidator returns a new instance of `validator.Validate`.
@@ -55,33 +53,9 @@ func newValidator() *validator.Validate {
 		return propTypeRegex.MatchString(fl.Field().String())
 	})
 
-	// Define a custom validation tag for file names. Moreover, parses the given format into the current struct.
-	_ = v.RegisterValidation("jobfilename", func(fl validator.FieldLevel) bool {
-		parent := fl.Parent()
-		jfn, ok := parent.Addr().Interface().(*ScopeJobFileName)
-		if !ok {
-			return false
-		}
-
-		matches_ := parseFileNameRegex.FindAllStringSubmatch(jfn.Value, -1)
-		matches := slice.Map(matches_, func(s []string) string { return s[1] })
-
-		i := len(matches)
-		jfn.Value = parseFileNameRegex.ReplaceAllStringFunc(jfn.Value, func(s string) string {
-			defer func(i *int) { *i-- }(&i)
-			return fmt.Sprintf("{%d}", len(matches)-i)
-		})
-		for i, match := range matches {
-			if ok = jfn.Assign(i, strings.Split(match, ".")); !ok {
-				return false
-			}
-		}
-
-		// Extract the file extension.
-		cs := strings.Split(jfn.Value, ".")
-		jfn.Extension = cs[len(cs)-1]
-
-		return true
+	// Define a custom validation tag for file names.
+	_ = v.RegisterValidation("filename", func(fl validator.FieldLevel) bool {
+		return fileNameRegex.MatchString(fl.Field().String())
 	})
 
 	return v

@@ -150,7 +150,7 @@ models:
   - name: User
     extends: internal.PublicEntity
     props:
-      - name: Key
+      - name: ReplacementKey
         type: string
         description: The user's name
         addons:

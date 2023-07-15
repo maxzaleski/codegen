@@ -96,7 +96,7 @@ func NewSpec(rl slog.ILogger, src string) (spec *Spec, err error) {
 		return
 	}
 
-	// Assign domain types.
+	// AssignMod domain types.
 	for _, s := range spec.Config.PkgDomain.Scopes {
 		s.Type = DomainTypePkg
 	}
@@ -105,7 +105,9 @@ func NewSpec(rl slog.ILogger, src string) (spec *Spec, err error) {
 	}
 
 	// Validate the resulting struct.
+	l.Log("validation", "msg", "validating configuration")
 	err = validate.Struct(spec.Config)
+
 	return
 }
 

@@ -9,27 +9,27 @@ import (
 	"github.com/maxzaleski/codegen/internal/metrics"
 	"github.com/maxzaleski/codegen/internal/utils/slice"
 	"github.com/maxzaleski/codegen/pkg/gen/queue"
+	"golang.org/x/sync/errgroup"
 	"sync"
 )
 
 type (
 	// IConcierge is the interface that wraps the generation concierge.
 	IConcierge interface {
-		WalkDirectoryStructure(md *core.Metadata, pkgs []*core.Package)
-		ExtractJobs(spec *core.Spec)
-		StartWorkers()
+		WalkDirectoryStructure(md *core.Metadata, pkgs []*core.Package) error
+		ExtractJobs(spec *core.Spec) error
+		StartWorkers() error
 		WaitQueueReadiness()
-		WaitAndCleanup()
+		WaitAndCleanup() error
 		WgAdd(delta int)
-		GetErrChannel() <-chan error
 	}
 
 	runtimeConcierge struct {
 		ctx    context.Context
+		errg   *errgroup.Group
 		config Config
 
-		errChan chan error
-		wg      *sync.WaitGroup
+		wg *sync.WaitGroup
 
 		queue      queue.IQueue[genJob]
 		logger     ILogger
@@ -39,28 +39,25 @@ type (
 )
 
 // newConcierge returns a new instance of IConcierge.
-func newConcierge(ctx1 context.Context, rl slog.ILogger, c Config, as []*core.DomainScope) IConcierge {
-	ms := ctx1.Value(contextKeyMetrics).(*metrics.Metrics)
+func newConcierge(ctx context.Context, rl slog.ILogger, errg *errgroup.Group, c Config, as []*core.DomainScope) IConcierge {
+	ms := ctx.Value(contextKeyMetrics).(*metrics.Metrics)
 
-	ctx2, cancel := context.WithCancel(ctx1)
 	s := &runtimeConcierge{
-		ctx:    ctx2,
+		ctx:    ctx,
+		errg:   errg,
 		config: c,
 
-		errChan: make(chan error, 1),
-		wg:      &sync.WaitGroup{},
+		wg: &sync.WaitGroup{},
 
 		queue:      newGenQueue(rl, ms, c),
 		logger:     newLogger(rl, "concierge", slog.Pink),
 		metrics:    ms,
 		aggrScopes: as,
 	}
-	go s.listenForError(cancel)
-
 	return s
 }
 
-func (c *runtimeConcierge) WalkDirectoryStructure(md *core.Metadata, pkgs []*core.Package) {
+func (c *runtimeConcierge) WalkDirectoryStructure(md *core.Metadata, pkgs []*core.Package) error {
 	const event = "dirwalk"
 
 	c.logger.Log(event, "msg", "starting directory structure walk")
@@ -84,26 +81,24 @@ func (c *runtimeConcierge) WalkDirectoryStructure(md *core.Metadata, pkgs []*cor
 			as.AbsoluteOutput = md.Cwd + "/" + as.Output
 			if as.Inline || j.Unique {
 				if err := createDirINE(as.Output, as.AbsoluteOutput); err != nil {
-					c.errChan <- err
-					return
+					return err
 				}
 				continue
 			}
 
 			for _, p := range pkgs {
 				if err := createDirINE(as.Output+"/"+p.Name, as.AbsoluteOutput+"/"+p.Name); err != nil {
-					c.errChan <- err
-					return
+					return err
 				}
 			}
 		}
 	}
+
+	return nil
 }
 
-func (c *runtimeConcierge) ExtractJobs(spec *core.Spec) {
+func (c *runtimeConcierge) ExtractJobs(spec *core.Spec) (err error) {
 	defer func() {
-		c.wg.Done()
-
 		c.queue.Close()
 		c.queue.Ready()
 	}()
@@ -155,6 +150,10 @@ func (c *runtimeConcierge) ExtractJobs(spec *core.Spec) {
 			const event = "feed"
 			c.logger.Log(event, "msg", "enqueuing jobs", "count", len(gJs))
 			for _, j := range gJs {
+				if err = j.Fill(); err != nil {
+					return err
+				}
+
 				// Case: len(jobs) > len(queue)
 				// Mark queue as ready once the queue is almost full.
 				q := c.queue
@@ -172,10 +171,23 @@ func (c *runtimeConcierge) ExtractJobs(spec *core.Spec) {
 	}
 }
 
-func (c *runtimeConcierge) StartWorkers() {
-	defer c.wg.Done()
-
+func (c *runtimeConcierge) StartWorkers() (_ error) {
 	c.logger.Log("workers", "msg", "starting workers", "count", c.config.WorkerCount)
+
+	fn := func(wID int) (err error) {
+		if err = worker(c.ctx, wID, c.queue); err != nil {
+			switch err {
+			case errFileAlreadyPresent, context.Canceled:
+			default:
+				c.logger.Log("worker:error<-",
+					"worker_id", wID,
+					"msg", "received an error",
+					"err", err,
+				)
+			}
+		}
+		return
+	}
 
 	for {
 		select {
@@ -183,23 +195,23 @@ func (c *runtimeConcierge) StartWorkers() {
 			return
 		default:
 			for i := 0; i < c.config.WorkerCount; i++ {
-				c.wg.Add(1)
-				go worker(c.ctx, i+1, c.wg, c.queue, c.errChan)
+				wID := i + 1 // `i` is captured by the closure.
+				c.errg.Go(func() error { return fn(wID) })
 			}
 			return
 		}
 	}
 }
 
-func (c *runtimeConcierge) WaitAndCleanup() {
-	defer c.logger.Log("exit", "msg", "returning to main thread – Goodbye 👋")
+func (c *runtimeConcierge) WaitAndCleanup() error {
+	c.logger.Log("wait", "msg", "blocking until all processes have completed")
+	defer c.logger.Log("exit", "msg", "goodbye 👋")
 
-	c.wg.Wait()
-	close(c.errChan)
-}
-
-func (c *runtimeConcierge) GetErrChannel() <-chan error {
-	return c.errChan
+	err := c.errg.Wait()
+	if err != nil {
+		c.logger.Log("main:error<-", "msg", "received an error", "err", err)
+	}
+	return err
 }
 
 func (c *runtimeConcierge) WaitQueueReadiness() {
@@ -212,24 +224,4 @@ func (c *runtimeConcierge) WaitQueueReadiness() {
 
 func (c *runtimeConcierge) WgAdd(delta int) {
 	c.wg.Add(delta)
-}
-
-func (c *runtimeConcierge) listenForError(cancel func()) {
-	// Waits for the first value to be sent to the error channel, subsequently terminates.
-	err, ok := <-c.errChan
-	// Channel is closed.
-	if !ok {
-		return
-	}
-
-	// Handle error.
-	if err != nil {
-		c.logger.Log("error<-", "msg", "received an error, cancelling the context", "err", err)
-
-		// Cancel the context, killing all workers.
-		cancel()
-
-		// Forward the error to the caller.
-		c.errChan <- err
-	}
 }
