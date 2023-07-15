@@ -10,7 +10,6 @@ import (
 	"github.com/maxzaleski/codegen/internal/utils/slice"
 	"github.com/maxzaleski/codegen/pkg/gen/queue"
 	"golang.org/x/sync/errgroup"
-	"sync"
 )
 
 type (
@@ -21,15 +20,12 @@ type (
 		StartWorkers() error
 		WaitQueueReadiness()
 		WaitAndCleanup() error
-		WgAdd(delta int)
 	}
 
 	runtimeConcierge struct {
 		ctx    context.Context
 		errg   *errgroup.Group
 		config Config
-
-		wg *sync.WaitGroup
 
 		queue      queue.IQueue[genJob]
 		logger     ILogger
@@ -46,8 +42,6 @@ func newConcierge(ctx context.Context, rl slog.ILogger, errg *errgroup.Group, c 
 		ctx:    ctx,
 		errg:   errg,
 		config: c,
-
-		wg: &sync.WaitGroup{},
 
 		queue:      newGenQueue(rl, ms, c),
 		logger:     newLogger(rl, "concierge", slog.Pink),
@@ -120,7 +114,7 @@ func (c *runtimeConcierge) ExtractJobs(spec *core.Spec) (err error) {
 						Metadata:     *spec.Metadata,
 						ScopeKey:     as.Key,
 					},
-					DisableTemplates: c.config.DisableTemplates,
+					DisableTemplates: c.config.IgnoreTemplates,
 				}
 
 				for _, sj := range as.Jobs {
@@ -220,8 +214,4 @@ func (c *runtimeConcierge) WaitQueueReadiness() {
 	if !ok {
 		return
 	}
-}
-
-func (c *runtimeConcierge) WgAdd(delta int) {
-	c.wg.Add(delta)
 }

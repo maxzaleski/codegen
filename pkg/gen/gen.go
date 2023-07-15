@@ -16,13 +16,21 @@ import (
 type (
 	// Config represents the tool's configuration .
 	Config struct {
-		DebugMode          bool
+		// Enable debug mode; print out debug messages to stdout.
+		DebugMode bool
+		// Enable debug worker metrics; print out worker metrics to stdout.
 		DebugWorkerMetrics bool
-		DeleteTmp          bool
-		DisableTemplates   bool
-		Location           string
-		WorkerCount        int
-
+		// Delete '{cwd}/.codegen/tmp' directory.
+		DeleteTmp bool
+		// Ignore specified templates; an empty template will be used instead.
+		IgnoreTemplates bool
+		// Disable log file; log file will not be created/populated.
+		DisableLogFile bool
+		// Location of the tool's folder; default: '{cwd}/.codegen'.
+		Location string
+		// Number of workers available in the runtime pool.
+		WorkerCount int
+		// TemplateFuncMap is a map of functions that can be called from templates.
 		TemplateFuncMap template.FuncMap
 	}
 )

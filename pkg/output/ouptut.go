@@ -26,13 +26,19 @@ type (
 	client struct {
 		core.Metadata
 
-		began time.Time
+		began          time.Time
+		disableLogFile bool
 	}
 )
 
 // New returns a new implementation of `Client`.
-func New(md core.Metadata, began time.Time) Client {
-	return &client{md, began}
+func New(md core.Metadata, began time.Time, disableLogFile bool) Client {
+	return &client{
+		Metadata: md,
+
+		began:          began,
+		disableLogFile: disableLogFile,
+	}
 }
 
 func (c *client) PrintInfo(lines ...string) {
@@ -40,7 +46,9 @@ func (c *client) PrintInfo(lines ...string) {
 }
 
 func (c *client) PrintError(err error) {
-	defer c.writeLog(err) // writes to log file.
+	if !c.disableLogFile {
+		defer c.writeLog(err) // writes to log file.
+	}
 
 	err, msg := utils.Unwrap(err), err.Error()
 	if valErrs, ok := err.(validator.ValidationErrors); ok {

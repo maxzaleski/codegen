@@ -15,7 +15,8 @@ var (
 	workersFlag            = flag.Int("workers", 30, "specify number of workers available in the runtime pool")
 	debugWorkerMetricsFlag = flag.Bool("workerMetrics", false, "debug must be enabled; prints worker metrics to stdout")
 	deleteTmpFlag          = flag.Bool("deleteTmp", false, "deletes the dir structure at '{cwd}/tmp'")
-	templateFlag           = flag.Bool("ignoreTemplates", false, "ignore templates read from configuration")
+	ignoreTemplatesFlag    = flag.Bool("ignoreTemplates", false, "ignore templates read from configuration")
+	disableLogFileFlag     = flag.Bool("disableLogFile", false, "ignore templates read from configuration")
 )
 
 func init() {
@@ -41,7 +42,8 @@ func New(funcMap template.FuncMap) {
 		DebugMode:          *debugFlag,
 		DebugWorkerMetrics: *debugWorkerMetricsFlag,
 		DeleteTmp:          *deleteTmpFlag,
-		DisableTemplates:   *templateFlag,
+		IgnoreTemplates:    *ignoreTemplatesFlag,
+		DisableLogFile:     *disableLogFileFlag,
 		Location:           *locFlag,
 		WorkerCount:        *workersFlag,
 
@@ -50,7 +52,7 @@ func New(funcMap template.FuncMap) {
 	md, mts, err := gen.Execute(c, start)
 
 	// Instantiate output client.
-	o := output.New(*md, start)
+	o := output.New(*md, start, c.DisableLogFile)
 
 	// Handle outcome.
 	if err != nil {

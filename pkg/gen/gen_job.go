@@ -32,6 +32,8 @@ type (
 	}
 )
 
+const tokenPkg = "pkg"
+
 // Fill sets the output file name and extension, and the output file absolute path.
 func (j *genJob) Fill() (err error) {
 	if j.OutputFile == nil {
@@ -44,7 +46,7 @@ func (j *genJob) Fill() (err error) {
 
 	tm := map[string]string{}
 	if j.Package != nil {
-		tm["pkg"] = j.Package.Name
+		tm[tokenPkg] = j.Package.Name
 	}
 	if of.Name, err = moddedstring.New(j.FileName, tm); err != nil {
 		return
