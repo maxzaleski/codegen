@@ -2,7 +2,7 @@ package gen
 
 import (
 	"github.com/maxzaleski/codegen/internal/core"
-	"github.com/maxzaleski/codegen/internal/utils/moddedstring"
+	"github.com/maxzaleski/codegen/internal/lib/moddedstring"
 	"strings"
 )
 

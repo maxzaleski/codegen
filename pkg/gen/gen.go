@@ -2,9 +2,9 @@ package gen
 
 import (
 	"context"
+	"github.com/maxzaleski/codegen/internal"
 	"github.com/maxzaleski/codegen/internal/core/slog"
 	"github.com/maxzaleski/codegen/internal/metrics"
-	"github.com/maxzaleski/codegen/internal/utils"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	"text/template"
@@ -36,10 +36,10 @@ type (
 )
 
 const (
-	contextKeyBegan    utils.ContextKey = "began"
-	contextKeyLogger   utils.ContextKey = "logger"
-	contextKeyMetrics  utils.ContextKey = "metrics"
-	contextKeyPackages utils.ContextKey = "packages"
+	contextKeyBegan    internal.ContextKey = "began"
+	contextKeyLogger   internal.ContextKey = "logger"
+	contextKeyMetrics  internal.ContextKey = "metrics"
+	contextKeyPackages internal.ContextKey = "packages"
 )
 
 func Execute(c Config, began time.Time) (md *core.Metadata, _ metrics.IMetrics, _ error) {

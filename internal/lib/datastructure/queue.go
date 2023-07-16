@@ -1,4 +1,4 @@
-package queue
+package datastructure
 
 import (
 	"github.com/maxzaleski/codegen/internal/core/slog"
@@ -50,10 +50,10 @@ type (
 
 var _ IQueue[any] = (*queue[any])(nil)
 
-// New creates a new queue.
+// NewQueue creates a new queue.
 //
 // The queue's capacity is set to `⌈workerCount * 1.5⌉`.
-func New[J any](nl slog.INamedLogger, m *metrics.Metrics, workerCount int) IQueue[J] {
+func NewQueue[J any](nl slog.INamedLogger, m *metrics.Metrics, workerCount int) IQueue[J] {
 	capacity := int(math.Ceil(float64(workerCount) * 1.5))
 	if workerCount < 10 { // Omit; prevents deadlock in debug mode.
 		capacity = 10

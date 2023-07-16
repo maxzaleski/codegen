@@ -2,7 +2,7 @@ package moddedstring
 
 import (
 	"fmt"
-	"github.com/maxzaleski/codegen/internal/utils/slice"
+	"github.com/maxzaleski/codegen/internal/lib/slice"
 	"regexp"
 )
 

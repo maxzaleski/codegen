@@ -3,16 +3,16 @@ package gen
 import (
 	"fmt"
 	"github.com/maxzaleski/codegen/internal/core/slog"
+	"github.com/maxzaleski/codegen/internal/lib/datastructure"
 	"github.com/maxzaleski/codegen/internal/metrics"
-	"github.com/maxzaleski/codegen/pkg/gen/queue"
 )
 
 type (
 	// IGenQueue is the interface that wraps the generation queue.
-	IGenQueue = queue.IQueue[genJob]
+	IGenQueue = datastructure.IQueue[genJob]
 
 	genQueue struct {
-		queue.IQueue[genJob]
+		datastructure.IQueue[genJob]
 
 		l ILogger
 	}
@@ -23,7 +23,7 @@ var _ IGenQueue = (*genQueue)(nil)
 func newGenQueue(l slog.ILogger, m *metrics.Metrics, c Config) IGenQueue {
 	nl := newLogger(l, "gen-queue", slog.None)
 	return &genQueue{
-		IQueue: queue.New[genJob](nl, m, c.WorkerCount),
+		IQueue: datastructure.NewQueue[genJob](nl, m, c.WorkerCount),
 		l:      nl,
 	}
 }

@@ -5,7 +5,7 @@ import (
 	"github.com/maxzaleski/codegen/internal/core"
 	"github.com/maxzaleski/codegen/internal/embeds"
 	"github.com/maxzaleski/codegen/internal/fs"
-	"github.com/maxzaleski/codegen/internal/utils/slice"
+	"github.com/maxzaleski/codegen/internal/lib/slice"
 	"github.com/maxzaleski/codegen/pkg/gen/partials"
 	"github.com/pkg/errors"
 	"strings"

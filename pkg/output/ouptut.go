@@ -3,11 +3,12 @@ package output
 import (
 	"fmt"
 	"github.com/go-playground/validator/v10"
+	"github.com/maxzaleski/codegen/internal"
 	"github.com/maxzaleski/codegen/internal/core/slog"
 	"github.com/maxzaleski/codegen/internal/fs"
+	"github.com/maxzaleski/codegen/internal/lib"
+	"github.com/maxzaleski/codegen/internal/lib/slice"
 	"github.com/maxzaleski/codegen/internal/metrics"
-	"github.com/maxzaleski/codegen/internal/utils"
-	"github.com/maxzaleski/codegen/internal/utils/slice"
 	"os"
 	"sort"
 	"strings"
@@ -50,7 +51,7 @@ func (c *client) PrintError(err error) {
 		defer c.writeLog(err) // writes to log file.
 	}
 
-	err, msg := utils.Unwrap(err), err.Error()
+	err, msg := lib.Unwrap(err), err.Error()
 	if valErrs, ok := err.(validator.ValidationErrors); ok {
 		if len(valErrs) == 1 {
 			msg = err.Error()
@@ -66,7 +67,7 @@ func (c *client) PrintError(err error) {
 		slog.Atom(slog.Red, eventPrefix("🫣"), "You've encountered an error:", msg),
 		infoAtom("🐞",
 			fmt.Sprintf("Please check the error log file %s for the complete stracktrace.", c.getLogDest()),
-			fmt.Sprintf("If the issue persists, please do report it to me: %s 👈", slog.Atom(slog.Cyan, utils.GHIssuesURL)),
+			fmt.Sprintf("If the issue persists, please do report it to me: %s 👈", slog.Atom(slog.Cyan, internal.GHIssuesURL)),
 		))
 }
 

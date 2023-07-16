@@ -6,9 +6,9 @@ import (
 	"github.com/maxzaleski/codegen/internal/core"
 	"github.com/maxzaleski/codegen/internal/core/slog"
 	"github.com/maxzaleski/codegen/internal/fs"
+	"github.com/maxzaleski/codegen/internal/lib/datastructure"
+	"github.com/maxzaleski/codegen/internal/lib/slice"
 	"github.com/maxzaleski/codegen/internal/metrics"
-	"github.com/maxzaleski/codegen/internal/utils/slice"
-	"github.com/maxzaleski/codegen/pkg/gen/queue"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -27,7 +27,7 @@ type (
 		errg   *errgroup.Group
 		config Config
 
-		queue      queue.IQueue[genJob]
+		queue      datastructure.IQueue[genJob]
 		logger     ILogger
 		metrics    metrics.IMetrics
 		aggrScopes []*core.DomainScope
