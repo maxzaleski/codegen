@@ -25,7 +25,7 @@ func NewSpec(rl slog.ILogger, src string) (spec *Spec, err error) {
 	l.Log(event, "msg", "parsing configuration")
 	defer func() {
 		if err == nil {
-			l.Log(event, "msg", "parsing complete", "packages", len(spec.Pkgs))
+			l.Log(event, "msg", "parsing completed", "packages", len(spec.Pkgs))
 		}
 	}()
 

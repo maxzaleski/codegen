@@ -5,6 +5,7 @@ import (
 	"github.com/maxzaleski/codegen/internal"
 	"github.com/maxzaleski/codegen/internal/core/slog"
 	"github.com/maxzaleski/codegen/internal/metrics"
+	"github.com/maxzaleski/codegen/pkg/gen/diagnostics"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	"text/template"
@@ -42,18 +43,27 @@ const (
 	contextKeyPackages internal.ContextKey = "packages"
 )
 
-func Execute(c Config, began time.Time) (md *core.Metadata, _ metrics.IMetrics, _ error) {
+func Execute(c Config, began time.Time) (md *core.Metadata, _ metrics.IMetrics, err error) {
 	sl := slog.New(c.DebugMode, began)
 
+	var spec *core.Spec
+
 	// Parse configuration via `.codegen` directory.
-	spec, err := core.NewSpec(sl, c.Location)
+	spec, err = core.NewSpec(sl, c.Location)
 	md = spec.Metadata // Always returned.
 	if err != nil {
 		err = errors.Wrapf(err, "failed to produce a new specification")
 		return
 	}
 
-	// Act upon the (dev) flag; delete tmp directory.
+	// Run diagnostics.
+	ctx1 := context.Background()
+	if err = diagnostics.Run(ctx1, sl, md.CodegenDir); err != nil {
+		err = errors.Wrapf(err, "failed to produce a new specification")
+		return
+	}
+
+	// -> [dev] Act upon the flag; delete tmp directory.
 	if c.DeleteTmp {
 		if err = removeTmpDir(md, sl); err != nil {
 			return
@@ -69,13 +79,13 @@ func Execute(c Config, began time.Time) (md *core.Metadata, _ metrics.IMetrics, 
 
 	ms := metrics.New()
 
-	errg, ctx := errgroup.WithContext(context.Background())
-	ctx = context.WithValue(ctx, contextKeyBegan, began)
-	ctx = context.WithValue(ctx, contextKeyLogger, sl)
-	ctx = context.WithValue(ctx, contextKeyMetrics, ms)
-	ctx = context.WithValue(ctx, contextKeyPackages, spec.Pkgs)
+	errg, ctx2 := errgroup.WithContext(ctx1)
+	ctx2 = context.WithValue(ctx2, contextKeyBegan, began)
+	ctx2 = context.WithValue(ctx2, contextKeyLogger, sl)
+	ctx2 = context.WithValue(ctx2, contextKeyMetrics, ms)
+	ctx2 = context.WithValue(ctx2, contextKeyPackages, spec.Pkgs)
 
-	concierge := newConcierge(ctx, sl, errg, c, aggrScopes)
+	concierge := newConcierge(ctx2, sl, errg, c, aggrScopes)
 
 	// -> Guarantees output directories exist during execution.
 	if err = concierge.WalkDirectoryStructure(spec.Metadata, spec.Pkgs); err != nil {
