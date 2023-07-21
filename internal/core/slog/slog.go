@@ -2,15 +2,16 @@ package slog
 
 import (
 	"fmt"
+	"log"
 	"sync"
 	"time"
 )
 
 type (
 	ILogger interface {
-		// Log wraps `fmt.Println`.
+		// Log wraps `log.Println`.
 		Log(lines ...any)
-		// Logf wraps `fmt.Println` with the given format.
+		// Logf wraps `log.Println` with the given format.
 		Logf(format string, a ...any)
 		// LogEnv logs an environment variable.
 		//
@@ -29,8 +30,10 @@ type (
 // New creates a new logger.
 func New(debugFlag bool, began time.Time) ILogger {
 	if began.IsZero() {
-		panic("logger: began cannot be zero")
+		panic("logger: `began` cannot be zero")
 	}
+
+	log.SetFlags(0) // Disable datetime prefix.
 
 	l := &logger{
 		mu:        &sync.Mutex{},
@@ -40,33 +43,24 @@ func New(debugFlag bool, began time.Time) ILogger {
 	if debugFlag {
 		l.LogEnv("Debug flag", "debug=1", "debug mode enabled, printing subsequent logs.")
 		l.Log(
-			Atom(Pink, "\n\n\tBe advised, this logger is called across goroutines, and as such logs may be in non-sequential order.\n"))
+			Atom(Pink, "\n\n\tBe advised, this l is called across goroutines, and as such logs may be in non-sequential order.\n"))
 	}
 	return l
 }
 
 func (l *logger) Log(lines ...any) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
 	if l.debugFlag {
 		linesCopy := make([]interface{}, 1, len(lines)+1)
 		linesCopy[0] = domain(LightYellow, "start", "+"+time.Since(l.began).String())
 		linesCopy = append(linesCopy, lines...)
-		fmt.Println(linesCopy...)
+		log.Println(linesCopy...) // The 'log' package is thread-safe.
 	}
 }
 
 func (l *logger) Logf(format string, a ...any) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	if l.debugFlag {
-		s := fmt.Sprintf(format, a...)
-		fmt.Println(s)
-	}
+	l.Log(fmt.Sprintf(format, a...))
 }
 
 func (l *logger) LogEnv(descriptor, flag string, msg string) {
-	l.Log(Atom(Blue, fmt.Sprintf("[env] %s flag is set (-%s); %s", descriptor, flag, msg)))
+	l.Log(Atom(Blue, fmt.Sprintf("[env:-%s] %s flag is set; %s", flag, descriptor, msg)))
 }
