@@ -2,6 +2,7 @@ package gen
 
 import (
 	"github.com/maxzaleski/codegen/internal/core"
+	"github.com/maxzaleski/codegen/internal/fs"
 	"github.com/maxzaleski/codegen/internal/lib/moddedstring"
 	"strings"
 )
@@ -17,52 +18,72 @@ type (
 	}
 
 	genJobFile struct {
-		Name         string
-		Ext          string
-		AbsolutePath string
+		Name            string
+		Ext             string
+		AbsolutePath    string
+		AbsoluteDirPath string
 	}
 
 	metadata struct {
 		core.Metadata
 
-		ScopeKey     string
-		DomainType   core.DomainType
-		AbsolutePath string
-		Inline       bool
+		ScopeKey   string
+		DomainType core.DomainType
+		Inline     bool
 	}
 )
 
 const tokenPkg = "pkg"
 
-// Fill sets the output file name and extension, and the output file absolute path.
-func (j *genJob) Fill() (err error) {
-	if j.OutputFile == nil {
-		j.OutputFile = &genJobFile{}
+// Prepare prepares the job for execution by filling-in missing fields, and verifying output directory structure.
+func (j *genJob) Prepare() (err error) {
+	if err = j.fill(); err != nil {
+		return
 	}
+	if err = j.checkOutputDirPresence(map[string]any{}); err != nil {
+		return
+	}
+	return
+}
 
+func (j *genJob) fill() (err error) {
 	// [1] Set output file name and extension.
-	cs, of := strings.Split(j.FileName, "."), j.OutputFile
-	of.Ext = cs[len(cs)-1]
+	cs, f := strings.Split(j.FileName, "."), j.OutputFile
+	f.Ext = cs[len(cs)-1]
 
 	tm := map[string]string{}
 	if j.Package != nil {
 		tm[tokenPkg] = j.Package.Name
 	}
-	if of.Name, err = moddedstring.New(j.FileName, tm); err != nil {
+	if f.Name, err = moddedstring.New(j.FileName, tm); err != nil {
 		return
 	}
 
 	// [2] Set output file absolute path.
-	fn, md, pkg := of.Name, j.Metadata, j.Package
-	of.AbsolutePath = md.AbsolutePath + "/"
+	fn, md, pkg := f.Name, j.Metadata, j.Package
+	f.AbsolutePath = f.AbsoluteDirPath + "/"
 
 	// (i) Inline: files are generated within the same directory space (e.g. models > User.Java, Car.Java).
 	// (i) Unique: job is only to be performed once for the specified output.
 	if md.Inline || j.Unique {
-		of.AbsolutePath += fn
+		f.AbsolutePath += fn
 	} else if pkg != nil {
-		of.AbsolutePath += pkg.Name + "/" + fn
+		f.AbsoluteDirPath += "/" + pkg.Name
+		f.AbsolutePath += pkg.Name + "/" + fn
 	}
 
 	return
+}
+
+func (j *genJob) checkOutputDirPresence(seenMap map[string]any) error {
+	key := j.Metadata.ScopeKey + "/" + j.OutputFile.Name
+	if j.Unique || j.Metadata.Inline {
+		if _, ok := seenMap[key]; ok {
+			//rc.logger.Log(event, "status", "seen", "path", path)
+			return nil
+		}
+		seenMap[key] = nil
+	}
+
+	return fs.CreateDirINE(j.OutputFile.AbsoluteDirPath)
 }

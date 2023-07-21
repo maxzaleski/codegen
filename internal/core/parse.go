@@ -48,9 +48,10 @@ func NewSpec(rl slog.ILogger, src string) (spec *Spec, err error) {
 	spec.Metadata.CodegenDir = cdp
 	spec.Metadata.Cwd = cwd
 
-	// Parse generator specification.
 	path := cdp + "/config.yaml"
 	l.Log(event, "msg", "parsing primary configuration", "path", path)
+
+	// Parse generator specification.
 	if err = unmarshal(path, spec.Config, true); err != nil {
 		return
 	}

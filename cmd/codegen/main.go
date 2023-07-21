@@ -12,7 +12,8 @@ import (
 var (
 	locFlag                = flag.String("location", "", "specify location of the tool's folder; default: '{cwd}/.codegen'")
 	debugFlag              = flag.Bool("debug", false, "enable debug mode; prints debug messages to stdout")
-	workersFlag            = flag.Int("workers", 30, "specify number of workers available in the runtime pool")
+	debugVerboseFlag       = flag.Bool("debugVerbose", false, "enable debug verbose mode; prints verbose error messages to stdout")
+	workersFlag            = flag.Int("workers", 30, "specify number of workers available in the runtime concierge")
 	debugWorkerMetricsFlag = flag.Bool("workerMetrics", false, "debug must be enabled; prints worker metrics to stdout")
 	deleteTmpFlag          = flag.Bool("deleteTmp", false, "deletes the dir structure at '{cwd}/tmp'")
 	ignoreTemplatesFlag    = flag.Bool("ignoreTemplates", false, "ignore templates read from configuration")
@@ -40,6 +41,7 @@ func New(funcMap template.FuncMap) {
 	// Execute code generation.
 	c := gen.Config{
 		DebugMode:          *debugFlag,
+		DebugVerbose:       *debugVerboseFlag,
 		DebugWorkerMetrics: *debugWorkerMetricsFlag,
 		DeleteTmp:          *deleteTmpFlag,
 		IgnoreTemplates:    *ignoreTemplatesFlag,
@@ -52,7 +54,7 @@ func New(funcMap template.FuncMap) {
 	md, mts, err := gen.Execute(c, start)
 
 	// Instantiate output client.
-	o := output.New(*md, start, c.DisableLogFile)
+	o := output.New(*md, start, c.DisableLogFile, c.DebugVerbose)
 
 	// Handle outcome.
 	if err != nil {

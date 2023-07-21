@@ -25,9 +25,9 @@ type (
 	}
 )
 
-func NewNamed(p ILogger, ns string, c Colour) INamedLogger {
+func NewNamed(src ILogger, ns string, c Colour) INamedLogger {
 	return &namedLogger{
-		logger:    p.(*logger),
+		logger:    src.(*logger),
 		namespace: ns,
 		colour:    c,
 	}

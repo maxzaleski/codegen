@@ -23,8 +23,8 @@ type (
 
 		// Close closes the queue. This is a one-time operation and is safe to call multiple times.
 		Close()
-		// ReadyListener returns a channel that is closed when the queue is ready.
-		ReadyListener() <-chan any
+		// ReadyObservable returns a channel that is closed when the queue is ready.
+		ReadyObservable() <-chan any
 		// Ready marks the queue as ready. This is a one-time operation and is safe to call multiple times.
 		Ready()
 	}
@@ -116,7 +116,7 @@ func (q *queue[T]) Ready() {
 	})
 }
 
-func (q *queue[T]) ReadyListener() <-chan any {
+func (q *queue[T]) ReadyObservable() <-chan any {
 	return q.readyChan
 }
 

@@ -14,7 +14,7 @@ import (
 var errWorkerAllJobsProcessed = errors.New("all jobs processed")
 
 func worker(ctx context.Context, id int, q IGenQueue) error {
-	pkgs, m, l :=
+	pkgs, m, logger :=
 		ctx.Value(contextKeyPackages).([]*core.Package),
 		ctx.Value(contextKeyMetrics).(*metrics.Metrics),
 		newLogger(
@@ -23,8 +23,8 @@ func worker(ctx context.Context, id int, q IGenQueue) error {
 			slog.None,
 		)
 
-	l.Log("start", "msg", "starting worker")
-	defer l.Log("exit", "msg", "worker exiting")
+	logger.Log("start", "msg", "starting worker")
+	defer logger.Log("exit", "msg", "worker exiting")
 
 	for {
 		if ctx.Err() != nil {
@@ -36,7 +36,7 @@ func worker(ctx context.Context, id int, q IGenQueue) error {
 			return errWorkerAllJobsProcessed // queue is empty; all jobs processed.
 		}
 
-		o, sk :=
+		mo, sk :=
 			&metrics.FileOutcome{AbsolutePath: j.OutputFile.AbsolutePath},
 			j.Metadata.ScopeKey
 		if s := strings.Split(sk, "/"); len(s) == 2 {
@@ -47,17 +47,17 @@ func worker(ctx context.Context, id int, q IGenQueue) error {
 		if p := j.Package; p != nil {
 			tag = p.Name
 		}
-		m.CaptureScope(sk, tag, *o)
+		m.CaptureScope(sk, tag, *mo)
 
-		if err := generateFile(pkgs, l, j); err != nil {
+		if err := generateFile(pkgs, logger, j); err != nil {
 			if errors.Is(errFileAlreadyPresent, err) {
 				return nil
 			}
 			return err
 		}
 
-		logFileOutcome(l, fileOutcomeSuccess, j)
-		o.Created = true
+		logFileOutcome(logger, fileOutcomeSuccess, j)
+		mo.Created = true
 
 		return nil
 	}
@@ -66,6 +66,7 @@ func worker(ctx context.Context, id int, q IGenQueue) error {
 var errFileAlreadyPresent = errors.New("file already exists")
 
 func generateFile(pkgs []*core.Package, l ILogger, j *genJob) error {
+	// TODO: evaluate whether to run job.
 	if _, err := os.Stat(j.OutputFile.AbsolutePath); err != nil {
 		if !os.IsNotExist(err) {
 			return errors.WithMessagef(err, "failed presence check at '%s'", j.OutputFile.AbsolutePath)

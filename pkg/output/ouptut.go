@@ -9,6 +9,7 @@ import (
 	"github.com/maxzaleski/codegen/internal/lib"
 	"github.com/maxzaleski/codegen/internal/lib/slice"
 	"github.com/maxzaleski/codegen/internal/metrics"
+	"log"
 	"os"
 	"sort"
 	"strings"
@@ -29,24 +30,29 @@ type (
 
 		began          time.Time
 		disableLogFile bool
+		debugVerbose   bool
 	}
 )
 
 // New returns a new implementation of `Client`.
-func New(md core.Metadata, began time.Time, disableLogFile bool) Client {
+func New(md core.Metadata, began time.Time, disableLogFile, debugVerbose bool) Client {
 	return &client{
 		Metadata: md,
 
 		began:          began,
 		disableLogFile: disableLogFile,
+		debugVerbose:   debugVerbose,
 	}
 }
 
 func (c *client) PrintInfo(lines ...string) {
-	fmt.Println(infoAtom("💡", lines...))
+	log.Println(infoAtom("💡", lines...))
 }
 
 func (c *client) PrintError(err error) {
+	if c.debugVerbose {
+		return
+	}
 	if !c.disableLogFile {
 		defer c.writeLog(err) // writes to log file.
 	}
@@ -63,7 +69,7 @@ func (c *client) PrintError(err error) {
 				"\n")
 		}
 	}
-	fmt.Printf("\n%s%s\n",
+	log.Printf("\n%s%s\n",
 		slog.Atom(slog.Red, eventPrefix("🫣"), "You've encountered an error:", msg),
 		infoAtom("🐞",
 			fmt.Sprintf("Please check the error log file %s for the complete stracktrace.", c.getLogDest()),
@@ -78,7 +84,7 @@ func (c *client) writeLog(err1 error) {
 	var err2 error
 	defer func(err2 error) {
 		if err2 != nil {
-			fmt.Println(eventPrefix("💀[critical]"), "unable to write to log file")
+			log.Println(eventPrefix("💀[critical]"), "unable to write to log file")
 		}
 	}(err2)
 
@@ -135,13 +141,13 @@ func (c *client) PrintFinalReport(ms metrics.IMetrics) {
 
 	// Print final report.
 	if totalFiles == 0 {
-		fmt.Printf("\n%s %s %s", eventPrefix("💭"), core.DomainDir, "unchanged")
+		log.Printf("\n%s %s %s", eventPrefix("💭"), core.DomainDir, "unchanged")
 		c.PrintInfo(
 			"If this is unexpected, verify that a new job is correctly defined in the config file.",
 			"For more information, please refer to the official documentation.",
 		)
 	} else {
-		fmt.Printf("\n%s Generated %s across %s in %s.\n",
+		log.Printf("\n%s Generated %s across %s in %s.\n",
 			eventPrefix("🤓"),
 			slog.Atom(slog.Blue, fmt.Sprintf("%d files", totalFiles)),
 			slog.Atom(slog.Blue, fmt.Sprintf("%d packages", len(slice.MapKeys(seenPkgsMap)))),

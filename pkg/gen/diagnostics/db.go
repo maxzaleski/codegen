@@ -17,7 +17,7 @@ type (
 		Conn() *sql.DB
 	}
 
-	databaseClient struct {
+	database struct {
 		conn   *sql.DB
 		logger slog.INamedLogger
 	}
@@ -39,25 +39,25 @@ func newDB(l slog.ILogger, location string) (IDatabase, error) {
 	nl.Log("open", "msg", "opening database connection", "src", src)
 
 	// -> Open the database connection.
-	db, err := sql.Open("sqlite3", src)
+	conn, err := sql.Open("sqlite3", src)
 	if err != nil {
 		return nil, errors.Wrap(err, "diagnostics: failed to open database")
 	}
-	c := &databaseClient{
-		conn:   db,
+	db := &database{
+		conn:   conn,
 		logger: nl,
 	}
 
 	// -> Seed the database.
-	if err = c.seed(); err != nil {
+	if err = db.seed(); err != nil {
 		return nil, err
 	}
 	defer nl.Log("ready", "msg", "database ready")
 
-	return c, nil
+	return db, nil
 }
 
-func (c *databaseClient) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+func (c *database) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
 	stmt, err := c.prepare(query)
 	if err != nil {
 		return nil, err
@@ -65,7 +65,7 @@ func (c *databaseClient) ExecContext(ctx context.Context, query string, args ...
 	return stmt.ExecContext(ctx, args...)
 }
 
-func (c *databaseClient) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+func (c *database) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
 	stmt, err := c.prepare(query)
 	if err != nil {
 		return nil, err
@@ -73,11 +73,11 @@ func (c *databaseClient) QueryContext(ctx context.Context, query string, args ..
 	return stmt.QueryContext(ctx, args...)
 }
 
-func (c *databaseClient) Conn() *sql.DB {
+func (c *database) Conn() *sql.DB {
 	return c.conn
 }
 
-func (c *databaseClient) prepare(query string) (*sql.Stmt, error) {
+func (c *database) prepare(query string) (*sql.Stmt, error) {
 	stmt, err := c.conn.Prepare(query)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to prepare statement")
@@ -87,18 +87,25 @@ func (c *databaseClient) prepare(query string) (*sql.Stmt, error) {
 	return stmt, nil
 }
 
-func (c *databaseClient) seed() (err error) {
+func (c *database) seed() (err error) {
 	c.logger.Log("seed", "msg", "seeding database")
 
-	q := `
+	qs := []string{
+		`
 CREATE TABLE IF NOT EXISTS runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ts TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    file_name TEXT NOT NULL,
     models_checksum BLOB NOT NULL,
     interface_checksum BLOB NOT NULL
-);`
-	if _, err = c.ExecContext(context.Background(), q); err != nil {
-		err = errors.Wrap(err, "diagnostics: failed to seed database")
+);`,
+		`CREATE INDEX IF NOT EXISTS file_name ON runs (file_name);`,
+	}
+
+	for i, q := range qs {
+		if _, err = c.ExecContext(context.Background(), q); err != nil {
+			err = errors.Wrapf(err, "diagnostics: failed to seed database: stmt[%d]", i)
+		}
 	}
 	return
 }

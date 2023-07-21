@@ -17,17 +17,17 @@ type (
 		Parent() slog.ILogger
 	}
 
-	logger struct {
+	logger_ struct { // '_' used to avoid name collision with this type.
 		slog.INamedLogger
 	}
 )
 
 // New creates a new logger specific to the `gen` package.
 func newLogger(p slog.ILogger, ns string, co slog.Colour) ILogger {
-	return &logger{slog.NewNamed(p, ns, co)}
+	return &logger_{slog.NewNamed(p, ns, co)}
 }
 
-func (l *logger) Ack(event string, j *genJob, fields ...any) {
+func (l *logger_) Ack(event string, j *genJob, fields ...any) {
 	fieldsCopy := make([]any, 4, 4+len(fields))
 	fieldsCopy[0], fieldsCopy[1] = "scope", j.Metadata.ScopeKey
 	fieldsCopy[2], fieldsCopy[3] = "job", j.Key
@@ -35,10 +35,10 @@ func (l *logger) Ack(event string, j *genJob, fields ...any) {
 	l.Log(event, fieldsCopy...)
 }
 
-func (l *logger) NamedParent() slog.INamedLogger {
+func (l *logger_) NamedParent() slog.INamedLogger {
 	return l.INamedLogger
 }
 
-func (l *logger) Parent() slog.ILogger {
+func (l *logger_) Parent() slog.ILogger {
 	return l.INamedLogger.Parent()
 }

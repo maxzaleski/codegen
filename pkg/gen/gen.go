@@ -19,6 +19,8 @@ type (
 	Config struct {
 		// Enable debug mode; print out debug messages to stdout.
 		DebugMode bool
+		// Enable verbose debug mode; print out verbose debug messages to stdout.
+		DebugVerbose bool
 		// Enable debug worker metrics; print out worker metrics to stdout.
 		DebugWorkerMetrics bool
 		// Delete '{cwd}/.codegen/tmp' directory.
@@ -29,7 +31,7 @@ type (
 		DisableLogFile bool
 		// Location of the tool's folder; default: '{cwd}/.codegen'.
 		Location string
-		// Number of workers available in the runtime pool.
+		// Number of workers available in the runtime concierge.
 		WorkerCount int
 		// TemplateFuncMap is a map of functions that can be called from templates.
 		TemplateFuncMap template.FuncMap
@@ -85,25 +87,14 @@ func Execute(c Config, began time.Time) (md *core.Metadata, _ metrics.IMetrics, 
 	ctx2 = context.WithValue(ctx2, contextKeyMetrics, ms)
 	ctx2 = context.WithValue(ctx2, contextKeyPackages, spec.Pkgs)
 
-	concierge := newConcierge(ctx2, sl, errg, c, aggrScopes)
+	// Start the runtime concierge.
+	concierge := newConcierge(ctx2, sl, errg, c)
 
-	// -> Guarantees output directories exist during execution.
-	if err = concierge.WalkDirectoryStructure(spec.Metadata, spec.Pkgs); err != nil {
-		err = errors.Wrapf(err, "failed to walk directory structure")
-		return
-	}
-
-	// -> Extract jobs and feed the queue.
-	errg.Go(func() error { return concierge.ExtractJobs(spec) })
-
-	// [blocking] wait for queue to be ready.
-	concierge.WaitQueueReadiness()
-
-	// -> Start workers.
-	errg.Go(func() error { return concierge.StartWorkers() })
+	// -> Execute preflight functions.
+	concierge.Start(spec, c)
 
 	// [blocking] wait for all goroutines to terminate.
-	if err = concierge.WaitAndCleanup(); err == nil {
+	if err = concierge.Wait(); err == nil {
 		// Act upon the (dev) flag; print worker metrics.
 		if c.DebugMode && c.DebugWorkerMetrics {
 			defer printWorkerMetrics(ms, sl, c.WorkerCount)
