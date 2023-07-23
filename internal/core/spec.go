@@ -61,8 +61,13 @@ type (
 		// Override is a flag that indicates whether the current job should override an existing file.
 		Override bool `yaml:"override" validate:"boolean"`
 		// OverrideOn indicates whether the job should override an existing file based on provided conditions.
-		OverrideOn map[string]interface{} `yaml:"override-on" validate:"omitempty,dive"`
-		Unique     bool                   `yaml:"unique" validate:"boolean"`
+		OverrideOn map[string]ScopeJobOverride `yaml:"override-on" validate:"omitempty,dive"`
+		Unique     bool                        `yaml:"unique" validate:"boolean"`
+	}
+
+	ScopeJobOverride struct {
+		Model     bool `yaml:"model"`
+		Interface bool `yaml:"interface"`
 	}
 
 	ScopeJobTemplate struct {
@@ -76,6 +81,15 @@ func (s *ScopeJob) Copy() *ScopeJob {
 	sCopy := *s
 	copy(sCopy.Templates, s.Templates)
 	return &sCopy
+}
+
+func (o *ScopeJobOverride) Merge(newO ScopeJobOverride) {
+	if !o.Model && newO.Model {
+		o.Model = true
+	}
+	if !o.Interface && newO.Interface {
+		o.Interface = true
+	}
 }
 
 type (

@@ -1,44 +1,39 @@
 package gen
 
 import (
-	"fmt"
-	"github.com/maxzaleski/codegen/internal/core/slog"
 	"github.com/maxzaleski/codegen/internal/lib/datastructure"
-	"github.com/maxzaleski/codegen/internal/metrics"
+	"github.com/maxzaleski/codegen/internal/slog"
 )
 
 type (
-	// IGenQueue is the interface that wraps the generation queue.
-	IGenQueue = datastructure.IQueue[genJob]
+	// IQueue is the interface that wraps the generation queue.
+	IQueue = datastructure.IQueue[genJob]
 
 	genQueue struct {
-		datastructure.IQueue[genJob]
+		IQueue
 
-		l ILogger
+		logger ILogger
 	}
 )
 
-var _ IGenQueue = (*genQueue)(nil)
+var _ IQueue = (*genQueue)(nil)
 
-func newGenQueue(l slog.ILogger, m *metrics.Metrics, c Config) IGenQueue {
-	nl := newLogger(l, "gen-queue", slog.None)
+func newQueue(l slog.ILogger, c Config) IQueue {
+	logger := newLogger(l, "queue", slog.None)
 	return &genQueue{
-		IQueue: datastructure.NewQueue[genJob](nl, m, c.WorkerCount),
-		l:      nl,
+		IQueue: datastructure.NewQueue[genJob](logger, c.WorkerCount),
+		logger: logger,
 	}
 }
 
 func (q *genQueue) Enqueue(j *genJob) {
-	defer q.l.Ack("enqueue<-", j)
+	defer q.logger.Ack("enqueue<-", j)
 	q.IQueue.Enqueue(j)
 }
 
-func (q *genQueue) Dequeue(wID int) (j *genJob) {
-	if j = q.IQueue.Dequeue(wID); j != nil {
-		defer q.l.Ack(
-			fmt.Sprintf("dequeue%s", slog.Atom(slog.Purple, fmt.Sprintf("->worker_%d", wID))),
-			j,
-		)
+func (q *genQueue) Dequeue() (j *genJob) {
+	if j = q.IQueue.Dequeue(); j != nil {
+		defer q.logger.Ack("dequeue->", j)
 	}
 	return
 }

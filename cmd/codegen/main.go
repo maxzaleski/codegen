@@ -14,7 +14,7 @@ var (
 	debugFlag              = flag.Bool("debug", false, "enable debug mode; prints debug messages to stdout")
 	debugVerboseFlag       = flag.Bool("debugVerbose", false, "enable debug verbose mode; prints verbose error messages to stdout")
 	workersFlag            = flag.Int("workers", 30, "specify number of workers available in the runtime concierge")
-	debugWorkerMetricsFlag = flag.Bool("workerMetrics", false, "debug must be enabled; prints worker metrics to stdout")
+	debugWorkerMetricsFlag = flag.Bool("workerMetrics", false, "debug must be enabled; prints worker metrics.go to stdout")
 	deleteTmpFlag          = flag.Bool("deleteTmp", false, "deletes the dir structure at '{cwd}/tmp'")
 	ignoreTemplatesFlag    = flag.Bool("ignoreTemplates", false, "ignore templates read from configuration")
 	disableLogFileFlag     = flag.Bool("disableLogFile", false, "ignore templates read from configuration")
@@ -51,16 +51,16 @@ func New(funcMap template.FuncMap) {
 
 		TemplateFuncMap: funcMap,
 	}
-	md, mts, err := gen.Execute(c, start)
+	res, err := gen.Execute(c, start)
 
 	// Instantiate output client.
-	o := output.New(*md, start, c.DisableLogFile, c.DebugVerbose)
+	o := output.New(*res.Metadata, start, c.DisableLogFile, c.DebugVerbose)
 
 	// Handle outcome.
 	if err != nil {
 		o.PrintError(err)
 		os.Exit(1)
 	} else {
-		o.PrintFinalReport(mts)
+		o.PrintFinalReport(res.Metrics)
 	}
 }

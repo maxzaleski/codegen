@@ -3,22 +3,19 @@ package gen
 import (
 	"fmt"
 	"github.com/maxzaleski/codegen/internal/core"
-	"github.com/maxzaleski/codegen/internal/core/slog"
-	"github.com/maxzaleski/codegen/internal/lib/slice"
-	"github.com/maxzaleski/codegen/internal/metrics"
+	"github.com/maxzaleski/codegen/internal/slog"
 	"github.com/pkg/errors"
 	"os"
-	"strings"
 )
 
 const (
-	fileOutcomeSuccess fileOutcome = "created"
-	fileOutcomeIgnored fileOutcome = "already-exists"
+	fileOutcomeSuccess jobOutcome = "created"
+	fileOutcomeIgnored jobOutcome = "already-exists"
 )
 
-type fileOutcome string
+type jobOutcome string
 
-func logFileOutcome(l ILogger, o fileOutcome, j *genJob) {
+func logFileOutcome(l ILogger, o jobOutcome, j *genJob) {
 	l.Ack("file", j, "status", string(o), "file", j.OutputFile.AbsolutePath)
 }
 
@@ -33,18 +30,20 @@ func removeTmpDir(md *core.Metadata, l slog.ILogger) error {
 	return nil
 }
 
-func printWorkerMetrics(m metrics.IMetrics, l slog.ILogger, wc int) {
-	// Filter out the scope keys.
-	keys := slice.Filter(m.Keys(), func(s string) bool {
-		return strings.HasPrefix(s, "worker_")
-	})
-
-	// Calculate the total throughput.
-	total := 0
-	for _, k := range keys {
-		total += m.Get(k).(int)
+func printWorkerMetrics(logger slog.ILogger, m map[int]int, wc int) {
+	keys, total, highest := 0, 0, 0
+	for _, w := range m {
+		total += w
+		if w > highest {
+			highest = w
+		}
+		keys++
 	}
 
-	msg := fmt.Sprintf("workers=%d avg_throughput=%d utilised=%d%%", wc, total/len(keys), (len(keys)*100)/wc)
-	l.LogEnv("Worker metrics", "workerMetrics=1", msg)
+	msg := fmt.Sprintf("workers=%d avg_throughput=%d highest=%d utilised=%d%%",
+		wc,
+		total/keys,
+		highest,
+		(keys*100)/wc)
+	logger.LogEnv("Worker metrics", "workerMetrics=1", msg)
 }

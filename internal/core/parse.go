@@ -1,7 +1,7 @@
 package core
 
 import (
-	"github.com/maxzaleski/codegen/internal/core/slog"
+	"github.com/maxzaleski/codegen/internal/slog"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 	"os"

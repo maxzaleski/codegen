@@ -76,10 +76,9 @@ func (j *genJob) fill() (err error) {
 }
 
 func (j *genJob) checkOutputDirPresence(seenMap map[string]any) error {
-	key := j.Metadata.ScopeKey + "/" + j.OutputFile.Name
 	if j.Unique || j.Metadata.Inline {
+		key := j.Metadata.ScopeKey + "/" + j.OutputFile.Name
 		if _, ok := seenMap[key]; ok {
-			//rc.logger.Log(event, "status", "seen", "path", path)
 			return nil
 		}
 		seenMap[key] = nil

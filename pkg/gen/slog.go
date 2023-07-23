@@ -1,7 +1,7 @@
 package gen
 
 import (
-	"github.com/maxzaleski/codegen/internal/core/slog"
+	"github.com/maxzaleski/codegen/internal/slog"
 )
 
 type (
@@ -22,7 +22,7 @@ type (
 	}
 )
 
-// New creates a new logger specific to the `gen` package.
+// newDiagnostics creates a new logger specific to the `gen` package.
 func newLogger(p slog.ILogger, ns string, co slog.Colour) ILogger {
 	return &logger_{slog.NewNamed(p, ns, co)}
 }

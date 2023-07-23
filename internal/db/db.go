@@ -1,11 +1,11 @@
-package diagnostics
+package db
 
 import (
 	"context"
 	"database/sql"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/maxzaleski/codegen/internal/core/slog"
 	"github.com/maxzaleski/codegen/internal/fs"
+	"github.com/maxzaleski/codegen/internal/slog"
 	"github.com/pkg/errors"
 )
 
@@ -23,8 +23,8 @@ type (
 	}
 )
 
-// NewDB returns a new implementation of `IDatabase`.
-func newDB(l slog.ILogger, location string) (IDatabase, error) {
+// New returns a new implementation of `IDatabase`.
+func New(l slog.ILogger, location string) (IDatabase, error) {
 	nl := slog.NewNamed(l, "diagnostics-db", slog.None)
 
 	nl.Log("init", "msg", "creating .run directory if it does not exist")

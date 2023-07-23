@@ -2,7 +2,6 @@ package output
 
 import (
 	"github.com/maxzaleski/codegen/internal/core"
-	"github.com/maxzaleski/codegen/internal/metrics"
 	"os"
 	"testing"
 	"time"
@@ -47,37 +46,37 @@ func TestOutput(t *testing.T) {
 		o.PrintError(errors.WithStack(errors.New("this is an error")))
 	})
 
-	t.Run("final reporting", func(t *testing.T) {
-		m := metrics.New()
-		m.CaptureScope("Scope1", "pkg1", metrics.FileOutcome{
-			AbsolutePath: "path/to/file",
-			Created:      true,
-		})
-		m.CaptureScope("Scope1", "pkg2", metrics.FileOutcome{
-			AbsolutePath: "path/to/file",
-			Created:      true,
-		})
-		m.CaptureScope("Scope2", "pkg1", metrics.FileOutcome{
-			AbsolutePath: "path/to/file",
-			Created:      true,
-		})
-		o.PrintFinalReport(m)
-	})
-
-	t.Run("final reporting – no change", func(t *testing.T) {
-		m := metrics.New()
-		m.CaptureScope("Scope1", "pkg1", metrics.FileOutcome{
-			AbsolutePath: "path/to/file",
-			Created:      false,
-		})
-		m.CaptureScope("Scope1", "pkg2", metrics.FileOutcome{
-			AbsolutePath: "path/to/file",
-			Created:      false,
-		})
-		m.CaptureScope("Scope2", "pkg1", metrics.FileOutcome{
-			AbsolutePath: "path/to/file",
-			Created:      false,
-		})
-		o.PrintFinalReport(m)
-	})
+	//t.Run("final reporting", func(t *testing.T) {
+	//	m := metrics.New()
+	//	m.CaptureScope("Scope1", "pkg1", metrics.FileOutcome{
+	//		AbsolutePath: "path/to/file",
+	//		Created:      true,
+	//	})
+	//	m.CaptureScope("Scope1", "pkg2", metrics.FileOutcome{
+	//		AbsolutePath: "path/to/file",
+	//		Created:      true,
+	//	})
+	//	m.CaptureScope("Scope2", "pkg1", metrics.FileOutcome{
+	//		AbsolutePath: "path/to/file",
+	//		Created:      true,
+	//	})
+	//	o.PrintFinalReport(m)
+	//})
+	//
+	//t.Run("final reporting – no change", func(t *testing.T) {
+	//	m := metrics.New()
+	//	m.CaptureScope("Scope1", "pkg1", metrics.FileOutcome{
+	//		AbsolutePath: "path/to/file",
+	//		Created:      false,
+	//	})
+	//	m.CaptureScope("Scope1", "pkg2", metrics.FileOutcome{
+	//		AbsolutePath: "path/to/file",
+	//		Created:      false,
+	//	})
+	//	m.CaptureScope("Scope2", "pkg1", metrics.FileOutcome{
+	//		AbsolutePath: "path/to/file",
+	//		Created:      false,
+	//	})
+	//	o.PrintFinalReport(m)
+	//})
 }

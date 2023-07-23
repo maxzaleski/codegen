@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"github.com/go-playground/validator/v10"
 	"github.com/maxzaleski/codegen/internal"
-	"github.com/maxzaleski/codegen/internal/core/slog"
 	"github.com/maxzaleski/codegen/internal/fs"
 	"github.com/maxzaleski/codegen/internal/lib"
 	"github.com/maxzaleski/codegen/internal/lib/slice"
-	"github.com/maxzaleski/codegen/internal/metrics"
+	"github.com/maxzaleski/codegen/internal/slog"
+	"github.com/maxzaleski/codegen/pkg/gen/modules"
 	"log"
 	"os"
 	"sort"
@@ -20,7 +20,7 @@ import (
 
 type (
 	Client interface {
-		PrintFinalReport(m metrics.IMetrics)
+		PrintFinalReport(m modules.IMetrics)
 		PrintError(err error)
 		PrintInfo(lines ...string)
 	}
@@ -111,28 +111,29 @@ func (c *client) writeLog(err1 error) {
 	}
 }
 
-func (c *client) PrintFinalReport(ms metrics.IMetrics) {
+func (c *client) PrintFinalReport(ms modules.IMetrics) {
 	// Alphabetically sort the packages.
-	scopes := slice.Filter(ms.Keys(), func(s string) bool { return !strings.HasPrefix(s, "worker_") })
+	jm := ms.GetJobsMetrics()
+	scopes := slice.MapKeys(jm)
 	sort.Strings(scopes)
 
-	// Print metrics per package.
+	// Print metrics.go per package.
 	totalFiles, seenPkgsMap := 0, make(map[string]bool)
 	for _, s := range scopes {
 		printScope(s)
 
-		obp := ms.Get(s).(metrics.OutcomesByPkg)
-		for pkg := range obp {
+		pms := jm[s].(map[string][]modules.MetricJob)
+		for pkg := range pms {
 			printPkg(pkg)
 
-			if len(obp[pkg]) != 0 && pkg != core.UniquePkgAlias {
+			if len(pms[pkg]) != 0 && pkg != core.UniquePkgAlias {
 				if !seenPkgsMap[pkg] {
 					seenPkgsMap[pkg] = true
 				}
 			}
-			for _, mrt := range obp[pkg] {
-				printFile(mrt.AbsolutePath, mrt.Created)
-				if mrt.Created {
+			for _, mrt := range pms[pkg] {
+				printFile(mrt.FileAbsolutePath, mrt.FileCreated)
+				if mrt.FileCreated {
 					totalFiles++
 				}
 			}

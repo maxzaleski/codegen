@@ -2,7 +2,7 @@ package core
 
 import (
 	"fmt"
-	"github.com/maxzaleski/codegen/internal/core/slog"
+	"github.com/maxzaleski/codegen/internal/slog"
 	"os"
 	"testing"
 	"time"

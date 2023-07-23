@@ -1,8 +1,7 @@
 package datastructure
 
 import (
-	"github.com/maxzaleski/codegen/internal/core/slog"
-	"github.com/maxzaleski/codegen/internal/metrics"
+	"github.com/maxzaleski/codegen/internal/slog"
 	"math"
 	"sync"
 )
@@ -12,7 +11,7 @@ type (
 		// Enqueue enqueues a job.
 		Enqueue(j *J)
 		// Dequeue blocks until a job is available. Returns nil if the queue is closed.
-		Dequeue(wID int) *J
+		Dequeue() *J
 
 		// GetSize returns the number of jobs in the queue.
 		GetSize() int
@@ -23,8 +22,8 @@ type (
 
 		// Close closes the queue. This is a one-time operation and is safe to call multiple times.
 		Close()
-		// ReadyObservable returns a channel that is closed when the queue is ready.
-		ReadyObservable() <-chan any
+		// ReadySignal returns a channel that is closed when the queue is ready.
+		ReadySignal() <-chan any
 		// Ready marks the queue as ready. This is a one-time operation and is safe to call multiple times.
 		Ready()
 	}
@@ -36,8 +35,7 @@ type (
 		collection chan *T
 		readyChan  chan any
 
-		nl      slog.INamedLogger
-		metrics *metrics.Metrics
+		nl slog.INamedLogger
 
 		// isClosed means the queue is no longer accepting jobs.
 		isClosed  bool
@@ -53,7 +51,7 @@ var _ IQueue[any] = (*queue[any])(nil)
 // NewQueue creates a new queue.
 //
 // The queue's capacity is set to `⌈workerCount * 1.5⌉`.
-func NewQueue[J any](nl slog.INamedLogger, m *metrics.Metrics, workerCount int) IQueue[J] {
+func NewQueue[J any](logger slog.INamedLogger, workerCount int) IQueue[J] {
 	capacity := int(math.Ceil(float64(workerCount) * 1.5))
 	if workerCount < 10 { // Omit; prevents deadlock in debug mode.
 		capacity = 10
@@ -63,8 +61,7 @@ func NewQueue[J any](nl slog.INamedLogger, m *metrics.Metrics, workerCount int) 
 		mu:       &sync.Mutex{},
 		capacity: capacity,
 
-		nl:      nl,
-		metrics: m,
+		nl: logger,
 
 		closeOnce: sync.Once{},
 		readyOnce: sync.Once{},
@@ -82,7 +79,7 @@ func (q *queue[T]) Enqueue(j *T) {
 	q.collection <- j // channels are thread-safe by default.
 }
 
-func (q *queue[T]) Dequeue(wID int) *T {
+func (q *queue[T]) Dequeue() *T {
 	j := <-q.collection // channels are thread-safe by default.
 	if j == nil {
 		if q.isClosed {
@@ -90,7 +87,6 @@ func (q *queue[T]) Dequeue(wID int) *T {
 		}
 		panic("queue: race condition")
 	}
-	defer q.metrics.CaptureWorker(wID)
 
 	return j
 }
@@ -116,7 +112,7 @@ func (q *queue[T]) Ready() {
 	})
 }
 
-func (q *queue[T]) ReadyObservable() <-chan any {
+func (q *queue[T]) ReadySignal() <-chan any {
 	return q.readyChan
 }
 
