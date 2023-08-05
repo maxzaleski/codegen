@@ -64,7 +64,7 @@ func newValidator() *validator.Validate {
 			return false
 		}
 		if mss := ssm[1]; mss != "" {
-			moddedstring.Validate(strings.Split(mss, ".")[1:])
+			return moddedstring.Validate(strings.Split(mss, ".")[1:])
 		}
 		return true
 	})

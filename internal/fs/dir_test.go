@@ -30,21 +30,21 @@ func TestCreateDirINE(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp directory: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func(path string) { _ = os.RemoveAll(path) }(tmpDir)
 
 	dirPath := filepath.Join(tmpDir, "test_dir")
 
 	// Create a directory that already exists.
-	if err := os.Mkdir(dirPath, 0777); err != nil {
+	if err = os.Mkdir(dirPath, 0777); err != nil {
 		t.Fatalf("failed to create directory: %v", err)
 	}
-	if err = CreateDirINE(dirPath); err != nil {
+	if _, err = CreateDirINE(dirPath); err != nil {
 		t.Errorf("CreateDirINE(%q) returned error: %v", dirPath, err)
 	}
 
 	// Create a new directory.
 	newDirPath := filepath.Join(tmpDir, "new_dir")
-	if err = CreateDirINE(newDirPath); err != nil {
+	if _, err = CreateDirINE(newDirPath); err != nil {
 		t.Errorf("CreateDirINE(%q) returned error: %v", newDirPath, err)
 	}
 	if _, err := os.Stat(newDirPath); os.IsNotExist(err) {

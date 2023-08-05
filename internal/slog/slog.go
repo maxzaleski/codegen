@@ -3,6 +3,7 @@ package slog
 import (
 	"fmt"
 	"log"
+	"os"
 	"sync"
 	"time"
 )
@@ -29,7 +30,7 @@ type (
 
 // New creates a new logger.
 func New(debugFlag bool, began time.Time) ILogger {
-	if began.IsZero() {
+	if os.Getenv("ENV") == "production" && began.IsZero() {
 		panic("logger: `began` cannot be zero")
 	}
 
@@ -43,7 +44,7 @@ func New(debugFlag bool, began time.Time) ILogger {
 	if debugFlag {
 		l.LogEnv("Debug flag", "debug=1", "debug mode enabled, printing subsequent logs.")
 		l.Log(
-			Atom(Pink, "\n\n\tBe advised, this l is called across goroutines, and as such logs may be in non-sequential order.\n"))
+			Atom(Pink, "\n\n\tBe advised, this logger is called across goroutines, and as such logs may be in non-sequential order.\n"))
 	}
 	return l
 }

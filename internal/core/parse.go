@@ -89,6 +89,7 @@ func NewSpec(rl slog.ILogger, src string) (spec *Spec, err error) {
 			}
 		}
 		spec.Pkgs = append(spec.Pkgs, pkg)
+		spec.Metadata.PkgsLastModifiedMap[pkg.Name] = info.ModTime().UnixNano()
 
 		return nil
 	})
@@ -99,10 +100,10 @@ func NewSpec(rl slog.ILogger, src string) (spec *Spec, err error) {
 
 	// AssignMod domain types.
 	for _, s := range spec.Config.PkgDomain.Scopes {
-		s.Type = DomainTypePkg
+		s.ParentType = DomainTypePkg
 	}
 	for _, s := range spec.Config.HttpDomain.Scopes {
-		s.Type = DomainTypeHttp
+		s.ParentType = DomainTypeHttp
 	}
 
 	// Validate the resulting struct.

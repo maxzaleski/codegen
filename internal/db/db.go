@@ -14,12 +14,14 @@ type (
 	IDatabase interface {
 		ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 		QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
+		RequiresSeed() bool
 		Conn() *sql.DB
 	}
 
 	database struct {
 		conn   *sql.DB
 		logger slog.INamedLogger
+		seed   bool
 	}
 )
 
@@ -32,7 +34,8 @@ func New(l slog.ILogger, location string) (IDatabase, error) {
 	// -> Create the '.run' directory if it does not exist.
 	dir := location + "/.run"
 	src := dir + "/diagnostics.db"
-	if err := fs.CreateDirINE(dir); err != nil {
+	ok, err := fs.CreateDirINE(dir)
+	if err != nil {
 		return nil, errors.Wrap(err, "diagnostics: failed to create '.run' directory")
 	}
 
@@ -46,11 +49,7 @@ func New(l slog.ILogger, location string) (IDatabase, error) {
 	db := &database{
 		conn:   conn,
 		logger: nl,
-	}
-
-	// -> Seed the database.
-	if err = db.seed(); err != nil {
-		return nil, err
+		seed:   ok,
 	}
 	defer nl.Log("ready", "msg", "database ready")
 
@@ -58,7 +57,7 @@ func New(l slog.ILogger, location string) (IDatabase, error) {
 }
 
 func (c *database) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
-	stmt, err := c.prepare(query)
+	stmt, err := c.conn.PrepareContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +65,7 @@ func (c *database) ExecContext(ctx context.Context, query string, args ...interf
 }
 
 func (c *database) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
-	stmt, err := c.prepare(query)
+	stmt, err := c.conn.PrepareContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -77,35 +76,6 @@ func (c *database) Conn() *sql.DB {
 	return c.conn
 }
 
-func (c *database) prepare(query string) (*sql.Stmt, error) {
-	stmt, err := c.conn.Prepare(query)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to prepare statement")
-	}
-	defer c.logger.Log("exec", "query", query)
-
-	return stmt, nil
-}
-
-func (c *database) seed() (err error) {
-	c.logger.Log("seed", "msg", "seeding database")
-
-	qs := []string{
-		`
-CREATE TABLE IF NOT EXISTS runs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    ts TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    file_name TEXT NOT NULL,
-    models_checksum BLOB NOT NULL,
-    interface_checksum BLOB NOT NULL
-);`,
-		`CREATE INDEX IF NOT EXISTS file_name ON runs (file_name);`,
-	}
-
-	for i, q := range qs {
-		if _, err = c.ExecContext(context.Background(), q); err != nil {
-			err = errors.Wrapf(err, "diagnostics: failed to seed database: stmt[%d]", i)
-		}
-	}
-	return
+func (c *database) RequiresSeed() bool {
+	return c.seed
 }

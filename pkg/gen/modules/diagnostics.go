@@ -1,52 +1,9 @@
 package modules
 
-import (
-	"github.com/maxzaleski/codegen/internal/core"
-	"github.com/maxzaleski/codegen/internal/db"
-	"strings"
-)
+import "github.com/maxzaleski/codegen/pkg/gen/modules/diagnostics"
 
-type (
-	IDiagnostics interface {
-		// Prepare optimises the diagnostics phase by determining which packages should be checked per a job's override
-		// rules.
-		Prepare(ds []*core.DomainScope)
-	}
+// IDiagnostics is an alias for diagnostics.IDiagnostics.
+type IDiagnostics = diagnostics.IDiagnostics
 
-	diagnostics struct {
-		db db.IDatabase
-
-		requiredAll      bool
-		requiredMap      map[string]*core.ScopeJobOverride
-		localSnapshotMap map[string]*snapshot
-	}
-
-	snapshot struct {
-	}
-)
-
-func NewDiagnostics(db db.IDatabase) IDiagnostics {
-	return &diagnostics{
-		db:          db,
-		requiredMap: map[string]*core.ScopeJobOverride{},
-	}
-}
-
-func (c *diagnostics) Prepare(ds []*core.DomainScope) {
-	for _, scope := range ds {
-		for _, job := range scope.Jobs {
-			for pkg, newO := range job.OverrideOn {
-				// Check for wildcard '*' token = all packages.
-				if pkg = strings.TrimPrefix(pkg, "\\"); pkg == "*" {
-					c.requiredAll = true
-					c.requiredMap = nil
-					return
-				}
-				// Otherwise, merge the two datasets.
-				if o, ok := c.requiredMap[pkg]; ok {
-					o.Merge(newO)
-				}
-			}
-		}
-	}
-}
+// NewDiagnostics is an alias for diagnostics.New.
+var NewDiagnostics = diagnostics.New

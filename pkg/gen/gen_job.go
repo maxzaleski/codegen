@@ -84,5 +84,6 @@ func (j *genJob) checkOutputDirPresence(seenMap map[string]any) error {
 		seenMap[key] = nil
 	}
 
-	return fs.CreateDirINE(j.OutputFile.AbsoluteDirPath)
+	_, err := fs.CreateDirINE(j.OutputFile.AbsoluteDirPath)
+	return err
 }

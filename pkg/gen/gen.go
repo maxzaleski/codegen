@@ -3,7 +3,7 @@ package gen
 import (
 	"context"
 	"database/sql"
-	"github.com/maxzaleski/codegen/internal"
+	"encoding/json"
 	"github.com/maxzaleski/codegen/internal/db"
 	"github.com/maxzaleski/codegen/internal/slog"
 	"github.com/maxzaleski/codegen/pkg/gen/modules"
@@ -16,24 +16,23 @@ import (
 )
 
 type (
-	// Config represents the tool's configuration .
 	Config struct {
 		// Enable debug mode; print out debug messages to stdout.
-		DebugMode bool
+		DebugMode bool `json:"debug_mode"`
 		// Enable verbose debug mode; print out verbose debug messages to stdout.
-		DebugVerbose bool
+		DebugVerbose bool `json:"debug_verbose"`
 		// Enable debug worker metrics.go; print out worker metrics.go to stdout.
-		DebugWorkerMetrics bool
+		DebugWorkerMetrics bool `json:"debug_worker_metrics"`
 		// Delete '{cwd}/.codegen/tmp' directory.
-		DeleteTmp bool
+		DeleteTmp bool `json:"delete_tmp"`
 		// Ignore specified templates; an empty template will be used instead.
-		IgnoreTemplates bool
+		IgnoreTemplates bool `json:"ignore_templates"`
 		// Disable log file; log file will not be created/populated.
-		DisableLogFile bool
+		DisableLogFile bool `json:"disable_log_file"`
 		// Location of the tool's folder; default: '{cwd}/.codegen'.
-		Location string
+		Location string `json:"location"`
 		// Number of workers available in the runtime concierge.
-		WorkerCount int
+		WorkerCount int `json:"worker_count"`
 		// TemplateFuncMap is a map of functions that can be called from templates.
 		TemplateFuncMap template.FuncMap
 	}
@@ -44,17 +43,14 @@ type (
 	}
 )
 
-const (
-	contextKeyBegan    internal.ContextKey = "began"
-	contextKeyLogger   internal.ContextKey = "logger"
-	contextKeyMetrics  internal.ContextKey = "metrics.go"
-	contextKeyPackages internal.ContextKey = "packages"
-)
+func (c Config) Marshal() ([]byte, error) {
+	return json.Marshal(c)
+}
 
 func Execute(c Config, began time.Time) (res *Result, err error) {
 	logger := slog.New(c.DebugMode, began)
 
-	// Parse configuration via `.codegen` directory.
+	// [1] Parse configuration via `.codegen` directory.
 	spec, err1 := core.NewSpec(logger, c.Location)
 	res = &Result{
 		Metadata: spec.Metadata, // Always returned; error handled second.
@@ -79,26 +75,27 @@ func Execute(c Config, began time.Time) (res *Result, err error) {
 	gctx.SetAny(contextKeyMetrics, res.Metrics)
 	gctx.SetAny(contextKeyPackages, spec.Pkgs)
 
-	// -> Start local sqlite database.
+	// [2] Start local sqlite database.
 	dbc, err2 := db.New(logger, spec.Metadata.CodegenDir)
 	if err = err2; err != nil {
 		return
 	}
 	defer func(conn *sql.DB) { _ = conn.Close() }(dbc.Conn())
 
+	// [3] Aggregate scopes from both domains.
 	hScopes, pScopes := spec.Config.HttpDomain.Scopes, spec.Config.PkgDomain.Scopes
 	ds := make([]*core.DomainScope, 0, len(hScopes)+len(pScopes))
 	ds = append(ds, hScopes...)
 	ds = append(ds, pScopes...)
 
-	// Start the runtime concierge.
-	concierge := newConcierge(gctx, errg, c, logger, dbc, ds)
+	// [4] Start the runtime concierge.
+	rc := newConcierge(errg, gctx, c, logger, dbc, ds)
 
-	// -> Execute preflight functions.
-	concierge.Start(spec, c)
+	// -> Begin generation.
+	rc.Start(c, spec, ds)
 
-	// [blocking] wait for all goroutines to terminate.
-	if err = concierge.Wait(); err == nil {
+	// -> [blocking] wait for all goroutines to terminate.
+	if err = rc.Wait(); err == nil {
 		// Act upon the (dev) flag; print worker metrics.
 		if c.DebugMode && c.DebugWorkerMetrics {
 			defer printWorkerMetrics(logger, res.Metrics.GetWorkMetrics(), c.WorkerCount)

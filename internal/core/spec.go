@@ -16,9 +16,11 @@ type Spec struct {
 
 func newSpec() *Spec {
 	return &Spec{
-		Config:   &Config{},
-		Pkgs:     make([]*Package, 0),
-		Metadata: &Metadata{},
+		Config: &Config{},
+		Pkgs:   make([]*Package, 0),
+		Metadata: &Metadata{
+			PkgsLastModifiedMap: make(map[string]int64),
+		},
 	}
 }
 
@@ -28,6 +30,8 @@ type Metadata struct {
 	CodegenDir string
 	// Location of the current working directory.
 	Cwd string
+	// Represents the last modified time of the packages (values in unix).
+	PkgsLastModifiedMap map[string]int64
 }
 
 // Config represents the configuration for the current generation.
@@ -92,6 +96,22 @@ func (o *ScopeJobOverride) Merge(newO ScopeJobOverride) {
 	}
 }
 
+func (o *ScopeJobOverride) AsSlice() []bool {
+	return []bool{ // order matters.
+		o.Model,
+		o.Interface,
+	}
+}
+
+func (o *ScopeJobOverride) Set(pi int, val bool) {
+	switch pi {
+	case 0:
+		o.Model = val
+	case 1:
+		o.Interface = val
+	}
+}
+
 type (
 	// Domain represents a generic top-level self-contained domain of operations.
 	Domain struct {
@@ -100,12 +120,11 @@ type (
 
 	// DomainScope represents a generic scope under a domain.
 	DomainScope struct {
-		Key            string      `yaml:"key" validate:"required"`
-		Output         string      `yaml:"output" validate:"required,dirlike"`
-		Inline         bool        `yaml:"inline" validate:"boolean"`
-		Jobs           []*ScopeJob `yaml:"jobs" validate:"dive"`
-		AbsoluteOutput string      `yaml:"-"`
-		Type           DomainType  `yaml:"-"`
+		Key        string      `yaml:"key" validate:"required"`
+		Output     string      `yaml:"output" validate:"required,dirlike"`
+		Inline     bool        `yaml:"inline" validate:"boolean"`
+		Jobs       []*ScopeJob `yaml:"jobs" validate:"dive"`
+		ParentType DomainType  `yaml:"-"`
 	}
 
 	DomainType string
@@ -194,9 +213,7 @@ func (m *Function) SortParams() {
 }
 
 func (m *Function) sort(s []*FnParameter) {
-	sort.Slice(s, func(i, j int) bool {
-		return s[i].Index > s[j].Index
-	})
+	sort.Slice(s, func(i, j int) bool { return s[i].Index > s[j].Index })
 }
 
 // Interface represents a generic interface definition.

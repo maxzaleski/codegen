@@ -15,15 +15,17 @@ func CreateDir(path string) error {
 }
 
 // CreateDirINE creates a directory at the given path if it doesn't exist.
-func CreateDirINE(path string) error {
+func CreateDirINE(path string) (bool, error) {
+	ok := false
 	if _, err := os.Stat(path); err != nil {
 		if !os.IsNotExist(err) {
-			return err
+			return false, err
 		}
 		// If the directory doesn't exist, create it.
-		if err := CreateDir(path); err != nil {
-			return err
+		if err = CreateDir(path); err != nil {
+			return false, err
 		}
+		ok = true
 	}
-	return nil
+	return ok, nil
 }

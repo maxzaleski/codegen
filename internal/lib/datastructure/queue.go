@@ -28,14 +28,22 @@ type (
 		Ready()
 	}
 
-	queue[T any] struct {
+	QueueHooks[J any] struct {
+		// OnEnqueue is called when a job is enqueued.
+		OnEnqueue func(j *J)
+		// OnDequeue is called when a job is dequeued.
+		OnDequeue func(j *J)
+	}
+
+	queue[J any] struct {
 		mu       *sync.Mutex
 		capacity int
 
-		collection chan *T
+		collection chan *J
 		readyChan  chan any
 
-		nl slog.INamedLogger
+		nl    slog.INamedLogger
+		hooks QueueHooks[J]
 
 		// isClosed means the queue is no longer accepting jobs.
 		isClosed  bool
@@ -51,7 +59,7 @@ var _ IQueue[any] = (*queue[any])(nil)
 // NewQueue creates a new queue.
 //
 // The queue's capacity is set to `⌈workerCount * 1.5⌉`.
-func NewQueue[J any](logger slog.INamedLogger, workerCount int) IQueue[J] {
+func NewQueue[J any](logger slog.INamedLogger, workerCount int, hooks *QueueHooks[J]) IQueue[J] {
 	capacity := int(math.Ceil(float64(workerCount) * 1.5))
 	if workerCount < 10 { // Omit; prevents deadlock in debug mode.
 		capacity = 10
@@ -61,7 +69,8 @@ func NewQueue[J any](logger slog.INamedLogger, workerCount int) IQueue[J] {
 		mu:       &sync.Mutex{},
 		capacity: capacity,
 
-		nl: logger,
+		nl:    logger,
+		hooks: *hooks,
 
 		closeOnce: sync.Once{},
 		readyOnce: sync.Once{},
@@ -71,15 +80,16 @@ func NewQueue[J any](logger slog.INamedLogger, workerCount int) IQueue[J] {
 	}
 }
 
-func (q *queue[T]) Enqueue(j *T) {
+func (q *queue[J]) Enqueue(j *J) {
 	if q.isClosed {
 		panic("queue is closed")
 	}
+	defer q.tryHook(q.hooks.OnEnqueue, j)
 
 	q.collection <- j // channels are thread-safe by default.
 }
 
-func (q *queue[T]) Dequeue() *T {
+func (q *queue[J]) Dequeue() *J {
 	j := <-q.collection // channels are thread-safe by default.
 	if j == nil {
 		if q.isClosed {
@@ -87,23 +97,24 @@ func (q *queue[T]) Dequeue() *T {
 		}
 		panic("queue: race condition")
 	}
+	defer q.tryHook(q.hooks.OnEnqueue, j)
 
 	return j
 }
 
-func (q *queue[T]) GetSize() int {
+func (q *queue[J]) GetSize() int {
 	return len(q.collection)
 }
 
-func (q *queue[T]) GetCapacity() int {
+func (q *queue[J]) GetCapacity() int {
 	return q.capacity
 }
 
-func (q *queue[T]) GetReady() bool {
+func (q *queue[J]) GetReady() bool {
 	return q.isReady
 }
 
-func (q *queue[T]) Ready() {
+func (q *queue[J]) Ready() {
 	q.readyOnce.Do(func() {
 		defer q.logState("ready", "queue is ready")
 
@@ -112,11 +123,11 @@ func (q *queue[T]) Ready() {
 	})
 }
 
-func (q *queue[T]) ReadySignal() <-chan any {
+func (q *queue[J]) ReadySignal() <-chan any {
 	return q.readyChan
 }
 
-func (q *queue[T]) Close() {
+func (q *queue[J]) Close() {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -128,6 +139,12 @@ func (q *queue[T]) Close() {
 	})
 }
 
-func (q *queue[any]) logState(state string, msg string) {
+func (q *queue[J]) logState(state string, msg string) {
 	q.nl.Log(state, "msg", msg, "remaining", q.GetSize())
+}
+
+func (q *queue[J]) tryHook(fn func(j *J), j *J) {
+	if fn != nil {
+		fn(j)
+	}
 }

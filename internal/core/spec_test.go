@@ -58,7 +58,7 @@ func TestScopeJobFileName_Assign(t *testing.T) {
 	//	},
 	//}
 	//for _, tt := range tests {
-	//	t.Run(tt.name, func(t *testing.T) {
+	//	t.Verify(tt.name, func(t *testing.T) {
 	//		s := &ScopeJobFileName{}
 	//		if ok := s.AssignMod(tt.vals); ok != tt.want {
 	//			t.Errorf("AssignMod() = %v, want %v", ok, tt.want)

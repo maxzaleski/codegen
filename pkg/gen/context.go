@@ -25,6 +25,13 @@ type (
 	}
 )
 
+const (
+	contextKeyBegan    internal.ContextKey = "began"
+	contextKeyLogger   internal.ContextKey = "logger"
+	contextKeyMetrics  internal.ContextKey = "metrics.go"
+	contextKeyPackages internal.ContextKey = "packages"
+)
+
 var _ IContext = (*genContext)(nil)
 
 func newGenContext(ctx context.Context) IContext {

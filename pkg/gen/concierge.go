@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"github.com/maxzaleski/codegen/internal/core"
 	"github.com/maxzaleski/codegen/internal/db"
+	"github.com/maxzaleski/codegen/internal/lib"
+	"github.com/maxzaleski/codegen/internal/lib/datastructure"
 	"github.com/maxzaleski/codegen/internal/lib/slice"
 	"github.com/maxzaleski/codegen/internal/slog"
 	"github.com/maxzaleski/codegen/pkg/gen/modules"
@@ -17,29 +19,29 @@ import (
 type (
 	// IConcierge is the interface that wraps the generation concierge.
 	IConcierge interface {
-		Start(spec *core.Spec, c Config)
+		Start(c Config, spec *core.Spec, scopes []*core.DomainScope)
 		Wait() error
 	}
 
 	concierge struct {
-		ctx  IContext
-		errg *errgroup.Group
-
+		ctx    IContext
 		config Config
-		queue  IQueue
 		logger ILogger
 
-		metrics modules.IMetrics
-		diags   modules.IDiagnostics
-		ttProc  modules.ITemplateProcessor
+		errg *errgroup.Group
+		ds   []*core.DomainScope
 
-		ds []*core.DomainScope
+		// Modules.
+		queue       datastructure.IQueue[genJob]
+		metrics     modules.IMetrics
+		diagnostics modules.IDiagnostics
+		ttProcessor modules.ITemplateProcessor
 	}
 )
 
 // newConcierge returns a new instance of IConcierge.
 func newConcierge(
-	ctx IContext, errg *errgroup.Group, c Config, logger slog.ILogger, db db.IDatabase, ds []*core.DomainScope,
+	errg *errgroup.Group, ctx IContext, c Config, logger slog.ILogger, db db.IDatabase, ds []*core.DomainScope,
 ) IConcierge {
 	metrics := ctx.GetMetrics()
 	s := &concierge{
@@ -47,58 +49,58 @@ func newConcierge(
 		errg:   errg,
 		config: c,
 
-		metrics: metrics,
-		ds:      ds,
-		queue:   newQueue(logger, c),
-		logger:  newLogger(logger, "concierge", slog.Pink),
-		diags:   modules.NewDiagnostics(db),
-		ttProc:  modules.NewTemplateProcessor(ctx.GetPackages()),
+		metrics:     metrics,
+		ds:          ds,
+		queue:       newQueue(logger, c),
+		logger:      newLogger(logger, "concierge", slog.Pink),
+		diagnostics: modules.NewDiagnostics(logger, db),
+		ttProcessor: modules.NewTemplateProcessor(ctx.GetPackages()),
 	}
 	return s
 }
 
 func (rc *concierge) Wait() (err error) {
-	rc.logger.Log("wait", "msg", "blocking until all processes have completed")
+	logger := rc.logger
+	logger.Log("wait", "msg", "blocking until all processes have completed")
 	defer func(err error) {
 		if err == nil {
-			rc.logger.Log("exit", "msg", "goodbye 👋")
+			logger.Log("exit", "msg", "goodbye 👋")
 		}
 	}(err)
 
 	if err = rc.errg.Wait(); err != nil {
-		rc.logger.Log("main:error<-", "msg", "received an error", "err", err)
+		logger.Log("main:error<-", "msg", "received an error", "err", err)
 
 		if rc.config.DebugVerbose {
-			p := rc.logger.Parent()
+			p := logger.Parent()
 			p.LogEnv("Debug verbose", "debugVerbose", "logging verbose error")
-			p.Logf("err=\n%+v", err)
+			p.Logf("verboseErr=\n%+v", err)
 		}
 	}
 	return
 }
 
-func (rc *concierge) Start(spec *core.Spec, c Config) {
+func (rc *concierge) Start(c Config, spec *core.Spec, scopes []*core.DomainScope) {
 	{
 		log := func(fields ...any) { rc.logger.Log("preflight", fields...) }
 		log("msg", "executing preflight functions")
 		defer log("msg", "done")
 	}
 
-	// [1] Run preliminary checks.
-	//
-	// This operation must be done before the queue is feed,
-	// as the diagnostics module depends on it for optimisation purposes.
-	rc.diags.Prepare(rc.ds)
+	// [1] Prepare diagnostics module.
+	if err := rc.diagnostics.Prepare(spec); err != nil {
+		panic(errors.Wrap(err, "concierge: failed to prepare diagnostics module"))
+	}
 
 	// [2] Extract jobs and feed the queue.
-	rc.errg.Go(func() error { return rc.feedQueue(spec, c) })
+	rc.errg.Go(func() error { return rc.feedQueue(c, *spec.Metadata, scopes, spec.Pkgs) })
 	<-rc.queue.ReadySignal()
 
 	// [3] Start workers.
 	rc.errg.Go(func() error { return rc.startWorkers() })
 }
 
-func (rc *concierge) feedQueue(s *core.Spec, c Config) error {
+func (rc *concierge) feedQueue(c Config, sm core.Metadata, scopes []*core.DomainScope, pkgs []*core.Package) error {
 	{
 		log := func(fields ...any) { rc.logger.Log("preflight:extract", fields...) }
 		log("msg", "starting job extraction")
@@ -108,7 +110,7 @@ func (rc *concierge) feedQueue(s *core.Spec, c Config) error {
 	// [1] Parse executable jobs.
 	//
 	// For each scope, we extract the jobs and enqueue them:
-	// • (1) If the scope is of HTTP type with the `Unique` flag set, we only enqueue the job once
+	// • (1) If domain = 'http' && j.Unique, we only enqueue the job once
 	// • (2) Otherwise, we enqueue a copy of the job for each package (default)
 	fJs := make([]*genJob, 0)
 	for _, scope := range rc.ds {
@@ -116,12 +118,12 @@ func (rc *concierge) feedQueue(s *core.Spec, c Config) error {
 			return &genJob{
 				Metadata: metadata{
 					Inline:     scope.Inline,
-					DomainType: scope.Type,
-					Metadata:   *s.Metadata,
+					DomainType: scope.ParentType,
+					Metadata:   sm,
 					ScopeKey:   scope.Key,
 				},
 				OutputFile: &genJobFile{
-					AbsoluteDirPath: s.Metadata.Cwd + "/" + scope.Output,
+					AbsoluteDirPath: sm.Cwd + "/" + scope.Output,
 				},
 				DisableTemplates: c.IgnoreTemplates,
 				ScopeJob:         sj,
@@ -130,13 +132,13 @@ func (rc *concierge) feedQueue(s *core.Spec, c Config) error {
 
 		for _, sJob := range scope.Jobs {
 			// -> Scenario (1)
-			if scope.Type == core.DomainTypeHttp && sJob.Unique {
+			if scope.ParentType == core.DomainTypeHttp && sJob.Unique {
 				fJs = append(fJs, newJob(sJob))
 				continue
 			}
 
 			// -> Scenario (2)
-			js := slice.Map(s.Pkgs,
+			js := slice.Map(pkgs,
 				func(p *core.Package) *genJob {
 					jPkg := newJob(sJob.Copy())
 					jPkg.ScopeJob.Key = fmt.Sprintf("%s-%s", p.Name, jPkg.ScopeJob.Key)
@@ -168,9 +170,10 @@ func (rc *concierge) enqueue(js []*genJob) error {
 			return err
 		}
 
+		// Ensures that if len(queue.remaining) < len(jobs.remaining), the queue is marked as 'ready' (for consumption),
+		// thereby allowing the remaining jobs to be enqueued.
 		q := rc.queue
 		if capacity := q.GetCapacity(); q.GetSize() == capacity-1 && len(js) > capacity {
-			// Mark queue scope ready once the queue is almost full.
 			if !q.GetReady() {
 				log("msg", "queue is almost full, marking as ready")
 			}
@@ -199,7 +202,7 @@ func (rc *concierge) startWorkers() (_ error) {
 				wID := i + 1 // `i` is captured by the closure.
 				rc.errg.Go(func() (err error) {
 					if err = rc.worker(wID); err != nil {
-						switch err {
+						switch lib.Unwrap(err) {
 						case errAllJobsProcessed, context.Canceled:
 							err = nil
 						default:
@@ -236,8 +239,9 @@ func (rc *concierge) worker(id int) error {
 	defer logger.Log("exit", "msg", "worker exiting")
 
 	exec := func(j *genJob) (err error) {
-		log := func(o jobOutcome) {
-			logger.Ack("file", j, "status", string(o), "file", j.OutputFile.AbsolutePath)
+		logOutcome := func(o jobOutcome) {
+			fn := strings.Replace(j.OutputFile.AbsolutePath, j.Metadata.Cwd, "", 1)
+			logger.Ack("file", j, "status", string(o), "file", fn)
 		}
 
 		// [1] Setup metric capture.
@@ -254,36 +258,52 @@ func (rc *concierge) worker(id int) error {
 		if p := j.Package; p != nil {
 			pk = p.Name
 		}
-		defer func() { metrics.CaptureJob(sk, pk, *mj) }()
+		defer func() { metrics.CaptureJob(sk, pk, *mj) }() // deferred as to allow mutation.
 
 		// [2] Evaluate whether to proceed.
 		//
 		// • Override: true, always run job
-		// • OverrideOn: should run iff the pkgs contents have changed per the property's specificities.
-		// TODO: evaluate whether to run job.
+		// • OverrideOn: should run iff the '.codegen/pkg' contents have changed per the `OverrideOn`'s specificities.
 		if !j.Override {
+			// [EXPERIMENTAL]: overrideOn: uncompleted.
+			//if len(j.OverrideOn) != 0 {
+			//	logger.Log("eval", "msg", "verifying configuration files")
+			//
+			//	// -> Check whether the configuration files have changed.
+			//	var ok bool
+			//	ok, err = rc.diagnostics.Verify(j.OverrideOn)
+			//	if err != nil {
+			//		return errors.Wrap(err, "failed to verify configuration files")
+			//	}
+			//
+			//	// -> ok: no change was detected since last use; exit.
+			//	if ok {
+			//		defer logOutcome(fileOutcomeIgnored)
+			//		return
+			//	}
+			//}
+
 			if _, err = os.Stat(j.OutputFile.AbsolutePath); err != nil {
 				if !os.IsNotExist(err) {
 					return errors.WithMessagef(err, "failed presence check at '%s'", j.OutputFile.AbsolutePath)
 				}
 			} else {
-				defer log(fileOutcomeIgnored)
+				defer logOutcome(fileOutcomeIgnored)
 				return
 			}
 		}
 
 		// [3] Execute templates.
-		f := j.OutputFile
-		if err = rc.ttProc.Exec(
+		if err = rc.ttProcessor.Exec(
 			j.Templates,
 			j.DisableTemplates,
 			j.Package,
-			f.AbsolutePath,
-			f.Ext,
+			j.OutputFile.AbsolutePath,
+			j.OutputFile.Ext,
 			rc.config.TemplateFuncMap,
 		); err == nil {
 			mj.FileCreated = true
-			defer log(fileOutcomeSuccess)
+			defer logOutcome(fileOutcomeSuccess)
 		}
 
 		return

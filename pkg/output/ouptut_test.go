@@ -46,7 +46,7 @@ func TestOutput(t *testing.T) {
 		o.PrintError(errors.WithStack(errors.New("this is an error")))
 	})
 
-	//t.Run("final reporting", func(t *testing.T) {
+	//t.Verify("final reporting", func(t *testing.T) {
 	//	m := metrics.New()
 	//	m.CaptureScope("Scope1", "pkg1", metrics.FileOutcome{
 	//		AbsolutePath: "path/to/file",
@@ -63,7 +63,7 @@ func TestOutput(t *testing.T) {
 	//	o.PrintFinalReport(m)
 	//})
 	//
-	//t.Run("final reporting – no change", func(t *testing.T) {
+	//t.Verify("final reporting – no change", func(t *testing.T) {
 	//	m := metrics.New()
 	//	m.CaptureScope("Scope1", "pkg1", metrics.FileOutcome{
 	//		AbsolutePath: "path/to/file",
