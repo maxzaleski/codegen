@@ -1,19 +1,13 @@
-# codegen
+# [wip] Codegen
 
-## Presence
+Code generation tool based on template and user-defined configuration files.
 
-Config is contained within root `.codegen` directory:
+This is a work in progress. 
 
-- Global config is labeled as `config.yaml`
-- Seperate pkg configs can be defined via `pkg` > `pkg/name.yaml`
-- Seperate template can be defined and specified via `tmpl` > `tmpl/job_addon.tmpl`
+## Features
 
-## Steps of Implementation
+- Define domains (models, services, http endpoints)
+- Define templates using previously defined domains
+- Define jobs & generate files
 
-1. Parse various config files into `Spec`
-2. Check for presence: if a pkg has already been generated, skip
-3. Generate
-
-## Extensions
-
-- Http
+This list is likely to be updated in the future.
